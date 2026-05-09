@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="tr" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F.R.I.D.A.Y.</title>
+    
+    <link rel="icon" href="logo/logo1.png" type="image/png">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
+    <style>
+        /* Açık Mod (Light Mode) Arka Planı: Soldan sağa gri-mavi degrade geçişi yapar */
+        body {
+            background: linear-gradient(to right, #e2e2e2, #c9e6ff);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            overflow-x: hidden; /* Sayfanın yatayda kaymasını engeller */
+        }
+        
+        /* Karanlık Mod (Dark Mode) Arka Planı: Tema dark olduğunda arka planı koyu gri yapar */
+        [data-bs-theme="dark"] body {
+            background: #1a1d21 !important; /* Yönetim panelindeki şık koyu renk */
+        }
+        
+        /* Sağdaki Açılır Kapanır Menü (Sidebar) Tasarımı */
+        .sidebar {
+            background: linear-gradient(180deg, #212529 0%, #1a1e21 100%);
+            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
+            min-height: 100vh; /* Tüm ekran yüksekliğini kaplar */
+            transition: all 0.3s ease;
+            border-radius: 20px; /* Köşeleri oval yapar */
+        }
+        
+        /* Genel Kart Tasarımı (Sonuç kutuları vb.) */
+        .main-card {
+            background: var(--bs-body-bg);
+            border: 1px solid var(--bs-border-color);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+            transition: transform 0.2s; /* Hover durumunda hareket etmesi için geçiş süresi */
+        }
+        
+        /* Arama Kutusu (Search Box) Tasarımı */
+        .search-box {
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
+            border-radius: 30px !important;
+            border: 1px solid var(--bs-border-color);
+        }
+        
+        /* Karanlık Modda Arama Kutusu Arka Planı */
+        [data-bs-theme="dark"] .search-box {
+            background: rgba(33, 37, 41, 0.9);
+        }
+        
+        /* Arama kutusuna tıklandığında (odaklanıldığında) beliren parlama efekti */
+        .search-box:focus-within {
+            box-shadow: 0 0 15px rgba(13, 110, 253, 0.25) !important;
+        }
+        
+        /* Karanlık modda arama butonlarına beyaz çerçeve ekleme */
+        [data-bs-theme="dark"] .search-box .btn-light,
+        [data-bs-theme="dark"] .search-box .btn-dark {
+            border: 1px solid #ffffff !important;
+        }
+        
+        /* Karanlık modda sesli arama (mikrofon) butonu renk ayarları */
+        [data-bs-theme="dark"] .voice-btn {
+            background-color: #212529 !important;
+            border: 1px solid #ffffff !important;
+        }
+        [data-bs-theme="dark"] .voice-btn i {
+            color: #ffffff !important;
+        }
+        
+        /* Hakkında Kutusunun (Modal içi) Tasarımı ve Tema Geçişleri */
+        .hakkinda-kutu {
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+        [data-bs-theme="light"] .hakkinda-kutu {
+            background-color: #f8f9fa !important;
+            color: #212529 !important;
+            border: none;
+        }
+        [data-bs-theme="dark"] .hakkinda-kutu {
+            background: linear-gradient(180deg, #212529 0%, #1a1e21 100%) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Bilgisayar ve Tablet Ekranları İçin Menü Konumlandırması (Genişlik > 768px) */
+        @media (min-width: 769px) {
+            .sidebar {
+                margin: 0 0 0 auto; /* Menüyü sağ kenara yapıştırır */
+                width: 260px !important; 
+                min-height: 100vh !important;
+                border-radius: 20px 0 0 20px; /* Sadece sol köşeleri oval yapar */
+            }
+        }
+        
+        /* Menü İçindeki Linklerin (Butonların) Görünümü */
+        .sidebar .nav-link {
+            border-radius: 20px;
+            padding: 10px 16px;
+            transition: all 0.25s ease-in-out;
+            font-weight: 500;
+        }
+        
+        /* Menü linkinin üzerine fareyle gelindiğinde (Hover) oluşan animasyon */
+        .sidebar .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+            transform: translateX(4px); /* Yazıyı hafif sağa kaydırır */
+            color: var(--bs-primary) !important;
+        }
+        
+        /* Mobil Ekranlar İçin Düzenlemeler (Genişlik < 768px) */
+        @media (max-width: 768px) {
+            /* Mobil cihazlarda ana içerik ve menü genişliğini %90 yapıp ortalar */
+            .main-card, .search-box, .sidebar {
+                width: 90% !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+            }
+            /* Mobilde menüyü varsayılan olarak gizler */
+            .sidebar {
+                min-height: auto;
+                display: none !important; 
+            }
+            /* Menü butonu tıklandığında .show class'ı eklenir ve menü görünür olur */
+            .sidebar.show {
+                display: flex !important; 
+            }
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="container-fluid min-vh-100 p-0">
+        <div class="row h-100 g-0">
+            
+            <div class="col-12 col-md-9 p-3 p-md-5 d-flex flex-column justify-content-center align-items-center text-center mx-auto">
+                
+                <div class="d-md-none mb-3 w-100 text-start ps-2">
+                    <button class="btn bg-body-secondary text-body rounded-pill px-3 border border-secondary shadow-sm" onclick="menuAcKapa()">
+                        <i class="bi bi-list-nested"></i> Menü
+                    </button>
+                </div>
+                
+                <div class="mb-3 mx-auto text-center w-100">
+                    <img src="logo/logo.png" alt="F.R.I.D.A.Y. Logo" class="img-fluid" style="max-width: 380px;">
+                </div>
+                <p class="text-secondary mb-4 mb-md-5 mx-auto w-100">Yapay zeka destekli akıllı arama deneyimi</p>
+                <form class="d-flex search-box p-2 p-md-3 w-75 mb-4 mb-md-5 align-items-center mx-auto">
+                    
+                    <button class="btn voice-btn me-1 me-md-2 rounded-circle p-2 bg-body-secondary border border-secondary shadow-sm" type="button" onclick="sesleAra()" title="Sesle Ara">
+                        <i class="bi bi-mic fs-5" style="color: var(--bs-body-color);"></i>
+                    </button>
+                    
+                    <input id="aranan_kutu" class="form-control border-0 bg-transparent shadow-none text-body" type="search" placeholder="Ne aramak istersiniz..." aria-label="Search">
+                    
+                    <button class="btn bg-body-secondary rounded-pill px-3 px-md-4 ms-1 ms-md-2 border border-secondary shadow-sm" type="submit" onclick="aramaYap(event)">
+                        <i class="bi bi-send-fill" style="color: var(--bs-body-color);"></i>
+                    </button>
+                    
+                </form>
+                
+                <div class="main-card p-3 p-4 w-75 mb-4 text-start mx-auto">
+                    <h5 class="text-muted mb-2 fs-6 fs-md-5">Arama Sonucu</h5>
+                    <p id="sonuc_kutusu" class="mb-0 text-secondary small">
+                        Henüz bir arama yapmadınız. Arama çubuğunu kullanarak hemen başlayın!
+                    </p>
+                </div>
+                
+                <!-- GÜNCELLENEN CEVAP KUTUSU: Metin ve İkonlar Çubukla Ayrıldı -->
+                <div class="main-card p-3 p-4 w-75 d-none cvp_kts mx-auto d-flex flex-column">
+                    
+                    <div class="d-flex flex-row justify-content-end align-items-center gap-3 mb-2 px-1">
+                        <i class="bi bi-copy text-secondary fs-5" role="button" onclick="kopyala()" title="Kopyala" style="cursor: pointer; transition: 0.2s;"></i>
+                        <i class="bi bi-share text-secondary fs-5" role="button" onclick="paylas()" title="Paylaş" style="cursor: pointer; transition: 0.2s;"></i>
+                    </div>
+                    
+                    <hr class="text-secondary my-2" style="opacity: 0.15; border-width: 1px;">
+                    
+                    <div class="text-start mt-1">
+                        <p class="mb-0 small" id="cevap_kutusu" style="line-height: 1.6;"></p>
+                    </div>
+                    
+                </div>
+                
+            </div>
+            
+            <div id="sidebar_cubugu" class="col-12 col-md-3 sidebar text-white d-flex flex-column p-4 justify-content-between">
+                <div>
+                    <div class="d-flex align-items-center mb-4">
+                        <i class="bi bi-list-nested me-2" style="font-size: 32px;"></i>
+                        <h4 class="mb-1">ARAÇLAR</h4>
+                    </div>
+                    
+                    <ul class="nav flex-column gap-2">
+                        <li class="nav-item">
+                            <a class="nav-link text-white d-flex align-items-center" href="/"><i class="bi bi-house-door me-3"></i>Ana Sayfa</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white d-flex align-items-center" href="#" data-bs-toggle="modal" data-bs-target="#hakkindaModal"><i class="bi bi-info-circle me-3"></i>Hakkında</a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link text-white d-flex align-items-center justify-content-between" data-bs-toggle="collapse" href="#hizmetlerAltMenu" role="button" aria-expanded="false">
+                                <div><i class="bi bi-gear me-3"></i>Hizmetler</div>
+                                <i class="bi bi-chevron-down small"></i>
+                            </a>
+                            <div class="collapse" id="hizmetlerAltMenu">
+                                <ul class="nav flex-column ms-3 mt-1 gap-1">
+                                    <li class="nav-item">
+                                        <a class="nav-link text-white py-1 small d-flex align-items-center" href="/">
+                                            <i class="bi bi-robot me-2"></i> Yapay Zeka
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link text-white py-1 small d-flex align-items-center" href="/kidem.html">
+                                            <i class="bi bi-calculator me-2"></i> Kıdem Tazminatı
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link text-white d-flex align-items-center" href="#" data-bs-toggle="modal" data-bs-target="#iletisimModal"><i class="bi bi-envelope me-3"></i>İletişim</a>
+                        </li>
+                    </ul>
+                    
+                    <hr class="text-white-50 my-4">
+                    
+                    <h6 class="text-white-50 mb-3"><i class="bi bi-clock-history me-2"></i>Son Aramalar</h6>
+                    <ul class="nav flex-column mb-auto gap-1" id="gecmis_listesi">
+                    </ul>
+                </div>
+                
+                <div class="mt-4 d-flex justify-content-center justify-content-md-start">
+                    <button id="temaButonu" class="btn btn-outline-light rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 50px; height: 50px; transition: all 0.3s ease;">
+                        <i class="bi bi-moon-fill fs-4"></i> 
+                    </button>
+                </div>
+                
+            </div>
+            
+        </div>
+    </div>
+    
+    <div class="modal fade" id="iletisimModal" tabindex="-1" aria-labelledby="iletisimModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold text-dark" id="iletisimModalLabel"><i class="bi bi-envelope-fill me-2"></i> İletişim</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+                <div class="modal-body">
+                    <form onsubmit="iletisimGonder(event)">
+                        <div class="mb-3">
+                            <label for="iletisimAd" class="form-label text-secondary small">Adınız Soyadınız</label>
+                            <input type="text" class="form-control" id="iletisimAd" required placeholder="Adınız Soyadınız">
+                        </div>
+                        <div class="mb-3">
+                            <label for="iletisimEposta" class="form-label text-secondary small">E-posta Adresiniz</label>
+                            <input type="email" class="form-control" id="iletisimEposta" required placeholder="ornek@email.com">
+                        </div>
+                        <div class="mb-3">
+                            <label for="iletisimKonu" class="form-label text-secondary small">Konu</label>
+                            <select class="form-select" id="iletisimKonu" required>
+                                <option value="" selected disabled>Lütfen bir konu seçin</option>
+                                <option value="Genel Bilgi ve Destek">Genel Bilgi ve Destek</option>
+                                <option value="Yapay Zeka Arama Sorunu">Yapay Zeka Arama Sorunu</option>
+                                <option value="Hizmet ve Ücret Bilgisi">Hizmet ve Ücret Bilgisi</option>
+                                <option value="Öneri ve Geri Bildirim">Öneri ve Geri Bildirim</option>
+                                <option value="İş Ortaklığı ve Teklif">İş Ortaklığı ve Teklif</option>
+                                <option value="Teknik Bir Hata Bildirimi">Teknik Bir Hata Bildirimi</option>
+                                <option value="Diğer">Diğer</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="iletisimMesaj" class="form-label text-secondary small">Mesajınız</label>
+                            <textarea class="form-control" id="iletisimMesaj" rows="3" required placeholder="Mesajınızı buraya yazın..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-dark w-100 rounded-pill mt-3">Gönder</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="hakkindaModal" tabindex="-1" aria-labelledby="hakkindaModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-sm">
+                <div class="modal-header border-0 pb-0 align-items-center">
+                    <h5 class="modal-title fw-bold text-primary d-flex align-items-center" id="hakkindaModalLabel">
+                        <img src="logo/logo1.png" alt="F.R.I.D.A.Y." class="me-2" style="width: 32px; height: 32px;">
+                        Hakkında - F.R.I.D.A.Y.
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="p-4 mb-3 hakkinda-kutu rounded-3 shadow-sm">
+                        <p class="mb-3 fs-5 fw-bold text-primary">Yapay Zekanın Büyülü Dünyasına Hoş Geldiniz!</p>
+                        <p class="mb-2"><strong>F.R.I.D.A.Y.</strong>, karmaşık veri yığınlarını ve sonsuz internet denizini sizin için aydınlatan, kusursuz ve yenilikçi bir yapay zeka destekli akıllı arama, özetleme ve analiz platformudur.</p>
+                        <p class="mb-2">Geleneksel arama motorlarının ötesine geçerek; en doğru, en güncel ve en rafine bilgiye saniyeler içinde ulaşmanızı sağlar. Akıllı algoritmalarımız, öğrenme süreçlerinizi hızlandırırken zamanınızı size geri kazandırır.</p>
+                        <p class="mb-0">Kişiselleştirilmiş, güvenilir ve eşsiz bir dijital deneyim için F.R.I.D.A.Y. her zaman yanınızda!</p>
+                    </div>
+                    <p class="mb-0 small text-center text-muted">© F.R.I.D.A.Y. - 2026</p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Kapat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/script.js?v=3.0"></script>
+    
+</body>
+</html>
