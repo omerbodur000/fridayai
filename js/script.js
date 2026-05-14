@@ -1,18 +1,56 @@
-// ... (Arama yapma, geçmişe ekleme, sesle arama vb. yukarıdaki mevcut kodlarınız aynı kalıyor, sadece iletisimGonder fonksiyonunu güncelliyoruz) ...
+// Resmi hafızada tutacağımız değişken
+let selectedImageBase64 = null;
 
+// ==========================================
+// RESİM SEÇME VE ÖNİZLEME (YENİ EKLENDİ)
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    // Base64 formatını sunucuya uygun hale getiriyoruz
+                    selectedImageBase64 = event.target.result.split(',')[1]; 
+                    document.getElementById('previewImg').src = event.target.result;
+                    document.getElementById('imagePreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+});
+
+// Resmi arayüzden ve hafızadan silen fonksiyon
+function clearImage() {
+    selectedImageBase64 = null;
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) fileInput.value = '';
+    const preview = document.getElementById('imagePreview');
+    if (preview) preview.style.display = 'none';
+    const img = document.getElementById('previewImg');
+    if (img) img.src = '';
+}
+
+// ==========================================
+// ARAMA YAPMA (METİN + GÖRSEL DESTEKLİ)
+// ==========================================
 async function aramaYap(event) {
-    event.preventDefault(); 
+    if(event) event.preventDefault(); 
     
-    const sorgu = document.getElementById('aranan_kutu').value;
+    const sorgu = document.getElementById('aranan_kutu').value.trim();
     const sonucKutusu = document.getElementById('sonuc_kutusu');
     const cevapKutusu = document.getElementById('cevap_kutusu');
     const cvpKts = document.querySelector('.cvp_kts');
 
-    if (!sorgu) return alert("Lütfen bir şey yazın!");
+    // Hem resim hem yazı yoksa uyar
+    if (!sorgu && !selectedImageBase64) return alert("Lütfen bir soru yazın veya bir resim yükleyin!");
 
     sonucKutusu.innerHTML = `
         <div class="spinner-border spinner-border-sm text-dark me-2" role="status"></div> 
-        Aranıyor...
+        F.R.I.D.A.Y. inceliyor...
     `;
     cvpKts.classList.add('d-none');
 
@@ -22,33 +60,36 @@ async function aramaYap(event) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ query: sorgu }) 
+            // Sunucuya artık hem sorguyu hem de resmi (varsa) gönderiyoruz
+            body: JSON.stringify({ query: sorgu, image: selectedImageBase64 }) 
         });
 
         const data = await response.json();
-        
-        // 🚨 SORUN BURADAYDI, ÇÖZÜLDÜ! 🚨
-        // Sunucu zaten her şeyi yapay zekaya hazırlatıp 'data.result' içinde bize gönderiyor.
-        // Bizim ön yüzde tekrar Google verisi (organic, knowledgeGraph) aramamıza gerek yok!
         let metin = data.result || "Arama sırasında bir hata oluştu.";
 
-        sonucKutusu.innerHTML = `<strong>Arama Sonucu:</strong> ${sorgu}`;
+        sonucKutusu.innerHTML = sorgu ? `<strong>Arama Sonucu:</strong> ${sorgu}` : `<strong>Görsel Analizi Tamamlandı</strong>`;
         
-        // 🚨 EKSTRA DÜZELTME: innerText yerine innerHTML kullandık ki, 
-        // Gemini'nin yaptığı kalın yazılar (**bold**) gibi formatlar ekranda düzgün görünsün.
-        // Markdown formatını HTML'e çeviren ufak bir kod ekliyoruz:
-        const formatliMetin = metin.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        // Markdown formatını HTML'e çevirme
+        let formatliMetin = metin.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        formatliMetin = formatliMetin.replace(/\n/g, '<br>');
         cevapKutusu.innerHTML = formatliMetin; 
         
         cvpKts.classList.remove('d-none');
-        gecmiseEkle(sorgu);
+        if(sorgu) gecmiseEkle(sorgu);
 
     } catch (error) {
         console.error("Hata:", error);
         sonucKutusu.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> Sunucuya bağlanılamadı.</span>`;
+    } finally {
+        // İşlem bitince resmi ekrandan kaldır, bir sonraki arama için temizle
+        clearImage();
+        document.getElementById('aranan_kutu').value = '';
     }
 }
 
+// ==========================================
+// DİĞER MEVCUT FONKSİYONLAR (BOZULMADAN KALDI)
+// ==========================================
 function kopyala() {
     let text = document.getElementById("cevap_kutusu").innerText;
     navigator.clipboard.writeText(text).then(() => {
@@ -59,7 +100,7 @@ function kopyala() {
 function paylas() {
     let text = document.getElementById("cevap_kutusu").innerText;
     if (navigator.share) {
-        navigator.share({ title: "Mercek AI", text: text });
+        navigator.share({ title: "F.R.I.D.A.Y.", text: text });
     } else {
         alert("Paylaşım özelliği bu tarayıcıda desteklenmiyor.");
     }
@@ -81,14 +122,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const temaButonu = document.getElementById('temaButonu');
     const htmlEtiketi = document.documentElement;
 
-    // Local Storage kontrolü
     const kayitliTema = localStorage.getItem('mercekTema') || 'light';
     if (kayitliTema === 'dark') {
         htmlEtiketi.setAttribute('data-bs-theme', 'dark');
-        temaButonu.innerHTML = '<i class="bi bi-brightness-high-fill fs-4 text-warning"></i>'; // Güneş ikonu (Sarı)
+        temaButonu.innerHTML = '<i class="bi bi-brightness-high-fill fs-4 text-warning"></i>';
         temaButonu.className = 'btn btn-outline-light rounded-circle d-flex align-items-center justify-content-center shadow-sm';
     } else {
-        // Eğer sayfa ilk açıldığında aydınlık moddaysa (Ay ikonu) onu da beyaz yapıyoruz
         temaButonu.innerHTML = '<i class="bi bi-moon-fill fs-4 text-white"></i>'; 
         temaButonu.className = 'btn btn-outline-light rounded-circle d-flex align-items-center justify-content-center shadow-sm';
     }
@@ -97,16 +136,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const suankiTema = htmlEtiketi.getAttribute('data-bs-theme');
 
         if (suankiTema === 'dark') {
-            // AYDINLIK MODA GEÇİŞ
             htmlEtiketi.setAttribute('data-bs-theme', 'light');
-            // Menü zemini koyu olduğu için Ay ikonunu beyaz yapıyoruz (text-white)
             temaButonu.innerHTML = '<i class="bi bi-moon-fill fs-4 text-white"></i>'; 
             temaButonu.className = 'btn btn-outline-light rounded-circle d-flex align-items-center justify-content-center shadow-sm';
             localStorage.setItem('mercekTema', 'light');
         } else {
-            // KARANLIK MODA GEÇİŞ
             htmlEtiketi.setAttribute('data-bs-theme', 'dark');
-            // Güneş ikonu sarı kalıyor (text-warning)
             temaButonu.innerHTML = '<i class="bi bi-brightness-high-fill fs-4 text-warning"></i>'; 
             temaButonu.className = 'btn btn-outline-light rounded-circle d-flex align-items-center justify-content-center shadow-sm';
             localStorage.setItem('mercekTema', 'dark');
@@ -168,20 +203,20 @@ function sesleAra() {
         recognition.onresult = (event) => {
             const konusmaMetni = event.results[0][0].transcript;
             aramaKutusu.value = konusmaMetni;
-            aramaKutusu.placeholder = "Ara...";
+            aramaKutusu.placeholder = "F.R.I.D.A.Y.'e sor veya resim yükle...";
             isListening = false;
             document.querySelector('form button[type="submit"]').click();
         };
 
         recognition.onspeechend = () => {
             recognition.stop();
-            aramaKutusu.placeholder = "Ara...";
+            aramaKutusu.placeholder = "F.R.I.D.A.Y.'e sor veya resim yükle...";
             isListening = false;
         };
 
         recognition.onerror = (event) => {
             console.error("Ses tanıma hatası:", event.error);
-            aramaKutusu.placeholder = "Ara...";
+            aramaKutusu.placeholder = "F.R.I.D.A.Y.'e sor veya resim yükle...";
             isListening = false;
             if (event.error !== 'aborted') {
                 alert("Ses algılanamadı, lütfen tekrar deneyin.");
@@ -189,7 +224,7 @@ function sesleAra() {
         };
     } else {
         if (recognition) recognition.stop();
-        aramaKutusu.placeholder = "Ara...";
+        aramaKutusu.placeholder = "F.R.I.D.A.Y.'e sor veya resim yükle...";
         isListening = false;
     }
 }
@@ -199,8 +234,6 @@ function menuAcKapa() {
     sidebar.classList.toggle('show');
 }
 
-// YENİDEN YAZILAN İLETİŞİM GÖNDERME FONKSİYONU
-// LocalStorage kirliliği kaldırıldı, sadece sunucuya atılıyor
 async function iletisimGonder(event) {
     event.preventDefault();
 
@@ -214,23 +247,17 @@ async function iletisimGonder(event) {
     try {
         const response = await fetch('/api/contact', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
 
         if (response.ok) {
             alert('Mesajınız başarıyla iletildi! Yönetim panelinde görebilirsiniz.');
-            
-            // Modalı Kapatma
             const modalElement = document.getElementById('iletisimModal');
             const modalInstance = bootstrap.Modal.getInstance(modalElement);
             if (modalInstance) {
                 modalInstance.hide();
             }
-
-            // Formu temizle
             event.target.reset();
         } else {
             alert('Mesaj gönderilirken bir hata oluştu.');

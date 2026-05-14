@@ -6,8 +6,10 @@ require('dotenv').config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// YENİ: Resim Base64 verileri büyük olduğu için limiti 50mb yaptık.
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Oturum Yönetimi
 app.use(session({
@@ -45,13 +47,37 @@ function girisKontrol(req, res, next) {
 }
 
 // ============================================
-// YAPAY ZEKA (GEMINI) DESTEKLİ ARAMA API
+// YAPAY ZEKA (GEMINI) DESTEKLİ ARAMA VE GÖRSEL API
 // ============================================
 app.post('/api/search', async (req, res) => {
     try {
-        const { query } = req.body;
+        const { query, image } = req.body;
         
-        // 1. Serper'den Veri Çek
+        // --- 1. SENARYO: KULLANICI RESİM YÜKLEDİYSE (Serper Atlanır, Direkt Gemini Görsel Analiz) ---
+        if (image) {
+            let textPrompt = query ? query : "Lütfen bu resmi detaylıca analiz et ve ne gördüğünü bana Türkçe açıkla.";
+            
+            try {
+                const aiResponse = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: [{
+                        role: 'user',
+                        parts: [
+                            { inlineData: { mimeType: 'image/jpeg', data: image } },
+                            { text: textPrompt }
+                        ]
+                    }]
+                });
+                return res.json({ result: aiResponse.text });
+            } catch (visionError) {
+                console.error("Görsel Analiz Hatası:", visionError.message);
+                return res.status(500).json({ error: "Görsel incelenirken bir hata oluştu." });
+            }
+        }
+
+        // --- 2. SENARYO: SADECE METİN VARSA (Mevcut Serper Mantığı) ---
+        if (!query) return res.json({ result: "Lütfen aramak için bir metin girin." });
+
         const response = await fetch('https://google.serper.dev/search', {
             method: 'POST',
             headers: { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' },
@@ -59,7 +85,6 @@ app.post('/api/search', async (req, res) => {
         });
         const searchResults = await response.json();
 
-        // 2. Verileri Birleştir
         let metin = "";
         if (searchResults.knowledgeGraph && searchResults.knowledgeGraph.description) {
             metin += searchResults.knowledgeGraph.description + " ";
@@ -68,7 +93,6 @@ app.post('/api/search', async (req, res) => {
             metin += searchResults.answerBox.snippet + " ";
         }
         if (searchResults.organic && searchResults.organic.length > 0) {
-            // Daha fazla veri gitsin diye ilk 5 sonucu alıyoruz
             metin += searchResults.organic.slice(0, 5).map(item => item.snippet || "").join(" ");
         }
 
@@ -76,10 +100,9 @@ app.post('/api/search', async (req, res) => {
             return res.json({ result: "Bu sorgu için internette hiçbir veri bulunamadı. Lütfen daha farklı bir kelime aratın." });
         }
 
-        // 3. Aşama: GEMINI'ye Gönder (GÜÇLÜ KOMUT)
         try {
             const aiResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash', // Hızlı ve kararlı ana model
+                model: 'gemini-2.5-flash',
                 contents: `Sen profesyonel bir asistansın. Aşağıdaki Google arama sonuçlarını (Arama Verileri) incele ve bana sadece bu verilere dayanarak kullanıcı için akıcı, doğal ve tek bir paragraftan oluşan Türkçe bir özet hazırla. Eğer veriler kısıtlıysa bile elindeki bilgileri toparlayıp tatmin edici bir cevap üret. Asla 'bilgi bulunamadı' veya 'özet çıkaramam' deme.\n\nArama Verileri: ${metin}`
             });
 
@@ -94,7 +117,7 @@ app.post('/api/search', async (req, res) => {
 
     } catch (error) {
         console.error("Sunucu Hatası:", error);
-        res.status(500).json({ error: "Arama sırasında bir hata oluştu." });
+        res.status(500).json({ error: "İşlem sırasında bir hata oluştu." });
     }
 });
 
@@ -127,8 +150,8 @@ app.get('/admin/login', (req, res) => {
     </head>
     <body>
         <div class="login-box text-center shadow-sm">
-            <div class="mb-3"><img src="/logo/logo1.png" alt="Mercek AI Logo" style="width: 64px; height: 64px;"></div>
-            <h4 class="mb-4 fw-bold">MERCEK AI - Admin</h4>
+            <div class="mb-3"><img src="/logo/logo1.png" alt="F.R.I.D.A.Y. Logo" style="width: 64px; height: 64px;"></div>
+            <h4 class="mb-4 fw-bold">F.R.I.D.A.Y. - Admin</h4>
             <form action="/admin/login" method="POST">
                 <div class="mb-3 text-start"><label class="form-label small text-muted">Kullanıcı Adı</label><input type="text" class="form-control rounded-pill" name="username" required></div>
                 <div class="mb-3 text-start"><label class="form-label small text-muted">Şifre</label><input type="password" class="form-control rounded-pill" name="password" required></div>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>F.R.I.D.A.Y.</title>
-
+    
     <link rel="icon" href="logo/logo1.png" type="image/png">
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -65,7 +65,7 @@
             border: 1px solid #ffffff !important;
         }
         
-        /* Karanlık modda sesli arama (mikrofon) butonu renk ayarları */
+        /* Karanlık modda sesli arama (mikrofon) ve kamera butonu renk ayarları */
         [data-bs-theme="dark"] .voice-btn {
             background-color: #212529 !important;
             border: 1px solid #ffffff !important;
@@ -132,6 +132,12 @@
                 display: flex !important; 
             }
         }
+
+        /* Resim Önizleme Stili */
+        #imagePreview img {
+            border: 2px solid var(--bs-primary);
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
@@ -151,13 +157,26 @@
                     <img src="logo/logo.png" alt="F.R.I.D.A.Y. Logo" class="img-fluid" style="max-width: 380px;">
                 </div>
                 <p class="text-secondary mb-4 mb-md-5 mx-auto w-100">Yapay zeka destekli akıllı arama deneyimi</p>
-                <form class="d-flex search-box p-2 p-md-3 w-75 mb-4 mb-md-5 align-items-center mx-auto">
+
+                <div id="imagePreview" class="mb-3 position-relative" style="display: none;">
+                    <img src="" id="previewImg" style="max-height: 120px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                    <button class="btn btn-danger btn-sm rounded-circle position-absolute top-0 start-100 translate-middle" onclick="clearImage()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+
+                <form class="d-flex search-box p-2 p-md-3 w-75 mb-4 mb-md-5 align-items-center mx-auto" onsubmit="aramaYap(event)">
                     
+                    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                    <button class="btn voice-btn me-1 me-md-2 rounded-circle p-2 bg-body-secondary border border-secondary shadow-sm" type="button" onclick="document.getElementById('fileInput').click()" title="Resim Ekle">
+                        <i class="bi bi-camera fs-5" style="color: var(--bs-body-color);"></i>
+                    </button>
+
                     <button class="btn voice-btn me-1 me-md-2 rounded-circle p-2 bg-body-secondary border border-secondary shadow-sm" type="button" onclick="sesleAra()" title="Sesle Ara">
                         <i class="bi bi-mic fs-5" style="color: var(--bs-body-color);"></i>
                     </button>
                     
-                    <input id="aranan_kutu" class="form-control border-0 bg-transparent shadow-none text-body" type="search" placeholder="Ne aramak istersiniz..." aria-label="Search">
+                    <input id="aranan_kutu" class="form-control border-0 bg-transparent shadow-none text-body" type="search" placeholder="F.R.I.D.A.Y.'e sor veya resim yükle..." aria-label="Search">
                     
                     <button class="btn bg-body-secondary rounded-pill px-3 px-md-4 ms-1 ms-md-2 border border-secondary shadow-sm" type="submit" onclick="aramaYap(event)">
                         <i class="bi bi-send-fill" style="color: var(--bs-body-color);"></i>
@@ -171,21 +190,16 @@
                         Henüz bir arama yapmadınız. Arama çubuğunu kullanarak hemen başlayın!
                     </p>
                 </div>
-                
-                <!-- GÜNCELLENEN CEVAP KUTUSU: Metin ve İkonlar Çubukla Ayrıldı -->
+
                 <div class="main-card p-3 p-4 w-75 d-none cvp_kts mx-auto d-flex flex-column">
-                    
                     <div class="d-flex flex-row justify-content-end align-items-center gap-3 mb-2 px-1">
                         <i class="bi bi-copy text-secondary fs-5" role="button" onclick="kopyala()" title="Kopyala" style="cursor: pointer; transition: 0.2s;"></i>
                         <i class="bi bi-share text-secondary fs-5" role="button" onclick="paylas()" title="Paylaş" style="cursor: pointer; transition: 0.2s;"></i>
                     </div>
-                    
                     <hr class="text-secondary my-2" style="opacity: 0.15; border-width: 1px;">
-                    
                     <div class="text-start mt-1">
                         <p class="mb-0 small" id="cevap_kutusu" style="line-height: 1.6;"></p>
                     </div>
-                    
                 </div>
                 
             </div>
@@ -272,6 +286,7 @@
                                 <option value="" selected disabled>Lütfen bir konu seçin</option>
                                 <option value="Genel Bilgi ve Destek">Genel Bilgi ve Destek</option>
                                 <option value="Yapay Zeka Arama Sorunu">Yapay Zeka Arama Sorunu</option>
+                                <option value="Hizmet ve Ücret Bilgisi">Hizmet ve Ücret Bilgisi</option>
                                 <option value="Öneri ve Geri Bildirim">Öneri ve Geri Bildirim</option>
                                 <option value="İş Ortaklığı ve Teklif">İş Ortaklığı ve Teklif</option>
                                 <option value="Teknik Bir Hata Bildirimi">Teknik Bir Hata Bildirimi</option>
