@@ -47,9 +47,6 @@ function girisKontrol(req, res, next) {
 }
 
 // ============================================
-// YAPAY ZEKA (GEMINI) DESTEKLİ ARAMA VE GÖRSEL API
-// ============================================
-// ============================================
 // YAPAY ZEKA (GEMINI) DESTEKLİ ARAMA, GÖRSEL VE HAFIZA API
 // ============================================
 app.post('/api/search', async (req, res) => {
@@ -205,45 +202,45 @@ app.get('/admin/login', (req, res) => {
     </body>
     </html>
     `);
-    });
+});
+
+app.post('/admin/login', (req, res) => {
+    const { username, password } = req.body;
+    const ADMIN_USER = process.env.ADMIN_USER;
+    const ADMIN_PASS = process.env.ADMIN_PASS;
     
-    app.post('/admin/login', (req, res) => {
-        const { username, password } = req.body;
-        const ADMIN_USER = process.env.ADMIN_USER;
-        const ADMIN_PASS = process.env.ADMIN_PASS;
-        
-        if (!ADMIN_USER || !ADMIN_PASS) return res.send(`<script>alert('Yönetici bilgileri eksik!'); window.location.href = '/admin/login';</script>`);
-        if (username === ADMIN_USER && password === ADMIN_PASS) { req.session.adminGirisli = true; res.redirect('/admin'); } 
-        else { res.send(`<script>alert('Kullanıcı adı veya şifre hatalı!'); window.location.href = '/admin/login';</script>`); }
-    });
-    
-    app.get('/admin/logout', (req, res) => {
-        if (req.session) {
-            req.session.destroy(() => { res.clearCookie('connect.sid'); res.redirect('/admin/login'); });
-        } else { res.redirect('/admin/login'); }
-    });
-    
-    app.get('/api/admin/messages', girisKontrol, (req, res) => {
-        const BİR_AY_MS = 30 * 24 * 60 * 60 * 1000;
-        const simdi = Date.now();
-        mesajlar = mesajlar.filter(m => (simdi - (m.timestamp || 0)) < BİR_AY_MS || !m.timestamp);
-        res.json(mesajlar);
-    });
-    
-    app.delete('/api/admin/messages/:index', girisKontrol, (req, res) => {
-        const index = parseInt(req.params.index);
-        if (index >= 0 && index < mesajlar.length) mesajlar.splice(index, 1);
-        res.json(mesajlar);
-    });
-    
-    app.delete('/api/admin/messages', girisKontrol, (req, res) => {
-        mesajlar = []; res.json(mesajlar);
-    });
-    
-    app.get('/admin', girisKontrol, (req, res) => {
-        res.sendFile(__dirname + '/yonetim.html');
-    });
-    
-    app.listen(PORT, () => {
-        console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor!`);
-    });
+    if (!ADMIN_USER || !ADMIN_PASS) return res.send(`<script>alert('Yönetici bilgileri eksik!'); window.location.href = '/admin/login';</script>`);
+    if (username === ADMIN_USER && password === ADMIN_PASS) { req.session.adminGirisli = true; res.redirect('/admin'); } 
+    else { res.send(`<script>alert('Kullanıcı adı veya şifre hatalı!'); window.location.href = '/admin/login';</script>`); }
+});
+
+app.get('/admin/logout', (req, res) => {
+    if (req.session) {
+        req.session.destroy(() => { res.clearCookie('connect.sid'); res.redirect('/admin/login'); });
+    } else { res.redirect('/admin/login'); }
+});
+
+app.get('/api/admin/messages', girisKontrol, (req, res) => {
+    const BİR_AY_MS = 30 * 24 * 60 * 60 * 1000;
+    const simdi = Date.now();
+    mesajlar = mesajlar.filter(m => (simdi - (m.timestamp || 0)) < BİR_AY_MS || !m.timestamp);
+    res.json(mesajlar);
+});
+
+app.delete('/api/admin/messages/:index', girisKontrol, (req, res) => {
+    const index = parseInt(req.params.index);
+    if (index >= 0 && index < mesajlar.length) mesajlar.splice(index, 1);
+    res.json(mesajlar);
+});
+
+app.delete('/api/admin/messages', girisKontrol, (req, res) => {
+    mesajlar = []; res.json(mesajlar);
+});
+
+app.get('/admin', girisKontrol, (req, res) => {
+    res.sendFile(__dirname + '/yonetim.html');
+});
+
+app.listen(PORT, () => {
+    console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor!`);
+});

@@ -1,8 +1,9 @@
-// Resmi hafızada tutacağımız değişken
+// Resmi ve sohbet geçmişini hafızada tutacağımız değişkenler
 let selectedImageBase64 = null;
+let sohbetHafizasi = []; 
 
 // ==========================================
-// RESİM SEÇME VE ÖNİZLEME (YENİ EKLENDİ)
+// RESİM SEÇME VE ÖNİZLEME
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('fileInput');
@@ -12,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(event) {
-                    // Base64 formatını sunucuya uygun hale getiriyoruz
                     selectedImageBase64 = event.target.result.split(',')[1]; 
                     document.getElementById('previewImg').src = event.target.result;
                     document.getElementById('imagePreview').style.display = 'block';
@@ -23,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Resmi arayüzden ve hafızadan silen fonksiyon
 function clearImage() {
     selectedImageBase64 = null;
     const fileInput = document.getElementById('fileInput');
@@ -33,12 +32,6 @@ function clearImage() {
     const img = document.getElementById('previewImg');
     if (img) img.src = '';
 }
-
-// ==========================================
-// ARAMA YAPMA (METİN + GÖRSEL DESTEKLİ)
-// ==========================================
-let selectedImageBase64 = null;
-let sohbetHafizasi = []; // YENİ: F.R.I.D.A.Y.'in kısa süreli belleği
 
 // ==========================================
 // ARAMA YAPMA (METİN + GÖRSEL + HAFIZA DESTEKLİ)
@@ -60,18 +53,17 @@ async function aramaYap(event) {
         const response = await fetch('/api/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            // YENİ: Artık sunucuya 'history' (hafıza) dizisini de gönderiyoruz
             body: JSON.stringify({ query: sorgu, image: selectedImageBase64, history: sohbetHafizasi }) 
         });
 
         const data = await response.json();
         let metin = data.result || "Arama sırasında bir hata oluştu.";
 
-        // YENİ: Konuşmayı hafızaya kaydet 
+        // Konuşmayı hafızaya kaydet 
         if (sorgu) {
             sohbetHafizasi.push({ role: "user", text: sorgu });
             sohbetHafizasi.push({ role: "model", text: metin });
-            // Sunucu çok şişmesin diye sadece son 6 mesajı (3 soru-cevap) aklında tutsun
+            // Sunucu çok şişmesin diye sadece son 6 mesajı aklında tutsun
             if (sohbetHafizasi.length > 6) sohbetHafizasi.splice(0, 2);
         }
 
@@ -103,7 +95,7 @@ async function aramaYap(event) {
 }
 
 // ==========================================
-// DİĞER MEVCUT FONKSİYONLAR (BOZULMADAN KALDI)
+// DİĞER MEVCUT FONKSİYONLAR
 // ==========================================
 function kopyala() {
     let text = document.getElementById("cevap_kutusu").innerText;
@@ -164,12 +156,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// GÜNCELLENDİ: Geçmişe eklerken uzun metinleri kısalt ve HTML'i temizle
 function gecmiseEkle(sorgu) {
-    // 1. Satır atlamalarını boşluğa çevir ve < > işaretlerini zararsız hale getir (Güvenlik)
     let temizSorgu = sorgu.replace(/\n/g, " ").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    
-    // 2. Eğer arama çok uzunsa (mesela kod yapıştırdıysan) sadece ilk 40 harfini kaydet
     if (temizSorgu.length > 40) {
         temizSorgu = temizSorgu.substring(0, 40) + "...";
     }
@@ -185,14 +173,12 @@ function gecmiseEkle(sorgu) {
     gecmisiYukle();
 }
 
-// GÜNCELLENDİ: Çift tırnak hatalarına karşı ekstra koruma
 function gecmisiYukle() {
     const liste = document.getElementById('gecmis_listesi');
     if(!liste) return;
     let gecmis = JSON.parse(localStorage.getItem('aramaGecmisi')) || [];
     liste.innerHTML = ''; 
     gecmis.forEach(sorgu => {
-        // Hem tek tırnak hem çift tırnakların kodu bozmasını engelliyoruz
         const guvenliSorgu = sorgu.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         
         liste.innerHTML += `
@@ -206,14 +192,10 @@ function gecmisiYukle() {
     });
 }
 
-// YENİ: Geçmişten Tekil Öğe Silme Fonksiyonu
 function gecmistenSil(sorgu) {
     let gecmis = JSON.parse(localStorage.getItem('aramaGecmisi')) || [];
-    // Tıklanan sorguyu diziden çıkar (filtrele)
     gecmis = gecmis.filter(item => item !== sorgu);
-    // Kalan listeyi tekrar kaydet
     localStorage.setItem('aramaGecmisi', JSON.stringify(gecmis));
-    // Listeyi ekranda anında güncelle
     gecmisiYukle();
 }
 
@@ -310,7 +292,7 @@ async function iletisimGonder(event) {
 }
 
 // ==========================================
-// YENİ: SESLİ OKUMA (TEXT TO SPEECH)
+// SESLİ OKUMA (TEXT TO SPEECH)
 // ==========================================
 let konusuyor = false;
 let sentezleyici = window.speechSynthesis;
@@ -322,28 +304,22 @@ function sesliOku() {
     if (!metin) return;
 
     if (konusuyor) {
-        // Eğer asistan zaten konuşuyorsa ve butona tekrar basılırsa sustur
         sentezleyici.cancel();
         konusuyor = false;
-        ikon.className = "bi bi-volume-up text-secondary fs-5"; // İkonu eski haline getir
+        ikon.className = "bi bi-volume-up text-secondary fs-5"; 
         return;
     }
 
-    // Okunacak metni hazırlıyoruz (kod bloklarını vs. temizleyip düz okuması için innerText kullandık)
     const okuma = new SpeechSynthesisUtterance(metin);
-    okuma.lang = 'tr-TR'; // Türkçe aksan
-    okuma.rate = 1.0; // Okuma hızı (0.5 yavaş, 1 normal, 1.5 hızlı)
+    okuma.lang = 'tr-TR'; 
+    okuma.rate = 1.0; 
 
-    // Konuşma bittiğinde ikonu otomatik düzelt
     okuma.onend = function() {
         konusuyor = false;
         ikon.className = "bi bi-volume-up text-secondary fs-5";
     };
 
-    // Konuşmayı başlat
     sentezleyici.speak(okuma);
     konusuyor = true;
-    
-    // Konuşurken ikonun rengini mavi yap ve içini doldur (görsel geri bildirim)
     ikon.className = "bi bi-volume-up-fill text-primary fs-5";
 }
