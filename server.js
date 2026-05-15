@@ -47,103 +47,99 @@ function girisKontrol(req, res, next) {
 }
 
 // ============================================
-// YAPAY ZEKA (GEMINI) DESTEKLİ ARAMA, GÖRSEL VE HAFIZA API
+// YAPAY ZEKA (GEMINI) DESTEKLİ ARAMA, GÖRSEL VE HAFIZA API (KURŞUNGEÇİRMEZ VERSİYON)
 // ============================================
 app.post('/api/search', async (req, res) => {
     try {
         const { query, image, history } = req.body;
         
-        // 0. HAFIZAYI HAZIRLAMA (Frontend'den gelen geçmişi Gemini'nin okuyacağı formata çeviriyoruz)
-        let gecmisFormatli = [];
+        // 1. HAFIZAYI DÜZ METNE ÇEVİR (En güvenli ve hatasız yöntem)
+        let gecmisMetni = "";
         if (history && history.length > 0) {
-            gecmisFormatli = history.map(msg => ({
-                role: msg.role,
-                parts: [{ text: msg.text }]
-            }));
+            gecmisMetni = "--- ÖNCEKİ KONUŞMALAR ---\n";
+            history.forEach(msg => {
+                let kim = msg.role === "user" ? "Kullanıcı" : "Sen (F.R.I.D.A.Y.)";
+                gecmisMetni += `${kim}: ${msg.text}\n`;
+            });
+            gecmisMetni += "-------------------------\n\n";
         }
 
         // --- 1. SENARYO: GÖRSEL ANALİZ ---
         if (image) {
-            let textPrompt = query ? query : "Lütfen bu resmi detaylıca analiz et ve ne gördüğünü bana Türkçe açıkla.";
+            let textPrompt = query ? query : "Lütfen bu resmi analiz et.";
+            let visionPrompt = gecmisMetni + "Kullanıcının Yeni Sorusu: " + textPrompt;
             
-            // Geçmişi ve resmi birleştiriyoruz
-            let visionContents = [...gecmisFormatli];
-            visionContents.push({
-                role: 'user',
-                parts: [
-                    { inlineData: { mimeType: 'image/jpeg', data: image } },
-                    { text: textPrompt }
-                ]
-            });
-
             try {
                 const aiResponse = await ai.models.generateContent({
                     model: 'gemini-2.5-flash',
-                    contents: visionContents
+                    contents: [{
+                        role: 'user',
+                        parts: [
+                            { inlineData: { mimeType: 'image/jpeg', data: image } },
+                            { text: visionPrompt }
+                        ]
+                    }]
                 });
                 return res.json({ result: aiResponse.text });
-            } catch (visionError) {
-                console.error("Görsel Analiz Hatası:", visionError.message);
-                return res.status(500).json({ error: "Görsel incelenirken bir hata oluştu." });
+            } catch (e) {
+                return res.json({ result: "Görsel işlenirken Google sunucularında hata: " + e.message });
             }
         }
 
         if (!query) return res.json({ result: "Lütfen aramak için bir metin girin." });
 
         // --- 2. ZEKİ YOL AYRIMI (ROUTER) ---
-        const routerPrompt = `Sen sistemin beynisin. Kullanıcının şu sorusunu analiz et: "${query}"\nEğer bu soru; güncel haber, fiyat, hava durumu veya güncel bilgi gerektiriyorsa SADECE "ARAMA" yaz.\nEğer bu soru; sohbetin devamıysa, bağlam içeriyorsa, matematik, kodlama veya sohbet ise SADECE "DIREKT" yaz.`;
-
-        const routerResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: routerPrompt
-        });
-        
-        const karar = routerResponse.text.trim().toUpperCase();
+        let karar = "DIREKT"; // Her ihtimale karşı varsayılan olarak kendi çözsün
+        try {
+            const routerPrompt = `Kullanıcının sorusu: "${query}"\nEğer bu soru; sadece güncel haber, anlık fiyat veya hava durumu ise SADECE "ARAMA" yaz.\nDiğer tüm durumlarda (sohbet, matematik, kod, bağlam vb.) SADECE "DIREKT" yaz.`;
+            const routerResponse = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: routerPrompt
+            });
+            karar = routerResponse.text.trim().toUpperCase();
+        } catch (e) {
+            console.error("Yol Ayrımı Hatası (Atlandı):", e.message);
+        }
         
         // --- DOĞRUDAN SOHBET SENARYOSU ---
-        if (karar.includes("DIREKT")) {
-            let directContents = [...gecmisFormatli];
-            directContents.push({
-                role: 'user',
-                parts: [{ text: `Sen F.R.I.D.A.Y. adında zeki bir asistansın. ÖNEMLİ KURALLAR:\n1. Kod düzeltmesi istenirse kodu Markdown formatında (\`\`\`) ver.\n2. Matematiksel işlemlerde KESİNLİKLE $ işareti veya LaTeX kullanma, düz dilde (örn: x kare) yaz.\n\nKullanıcının sorusu: "${query}"` }]
-            });
-
-            const directResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: directContents
-            });
-            return res.json({ result: directResponse.text });
+        if (karar.includes("DIREKT") || karar.includes("DİREKT")) {
+            try {
+                const directPrompt = `Sen F.R.I.D.A.Y. adında zeki bir asistansın. ÖNEMLİ KURALLAR:\n1. Kod düzeltmesi istenirse kodu Markdown formatında (\`\`\`) ver.\n2. Matematiksel işlemlerde KESİNLİKLE $ işareti veya LaTeX kullanma, düz dilde (örn: x kare) yaz.\n\n${gecmisMetni}Kullanıcının Yeni Sorusu: "${query}"`;
+                
+                const directResponse = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: directPrompt
+                });
+                return res.json({ result: directResponse.text });
+            } catch (e) {
+                return res.json({ result: "Cevap üretilirken hata oluştu: " + e.message });
+            }
         }
 
         // --- 3. SENARYO: İNTERNET ARAMASI (SERPER) ---
-        const response = await fetch('https://google.serper.dev/search', {
-            method: 'POST',
-            headers: { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ q: query, hl: "tr", gl: "tr" })
-        });
-        const searchResults = await response.json();
-
-        let metin = "";
-        if (searchResults.knowledgeGraph && searchResults.knowledgeGraph.description) metin += searchResults.knowledgeGraph.description + " ";
-        if (searchResults.answerBox && searchResults.answerBox.snippet) metin += searchResults.answerBox.snippet + " ";
-        if (searchResults.organic && searchResults.organic.length > 0) metin += searchResults.organic.slice(0, 5).map(item => item.snippet || "").join(" ");
-
-        if (!metin.trim()) {
-            let fallbackContents = [...gecmisFormatli, { role: 'user', parts: [{ text: query }] }];
-            const fallbackResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: fallbackContents
-            });
-            return res.json({ result: fallbackResponse.text });
-        }
-
         try {
-            let searchContents = [...gecmisFormatli];
-            searchContents.push({
-                role: 'user',
-                parts: [{ text: `Aşağıdaki Google arama sonuçlarını incele ve bana sadece bu verilere dayanarak akıcı bir Türkçe özet hazırla.\n\nArama Verileri: ${metin}\n\nKullanıcının Sorusu: ${query}` }]
+            const response = await fetch('https://google.serper.dev/search', {
+                method: 'POST',
+                headers: { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ q: query, hl: "tr", gl: "tr" })
             });
+            const searchResults = await response.json();
 
+            let metin = "";
+            if (searchResults.knowledgeGraph && searchResults.knowledgeGraph.description) metin += searchResults.knowledgeGraph.description + " ";
+            if (searchResults.answerBox && searchResults.answerBox.snippet) metin += searchResults.answerBox.snippet + " ";
+            if (searchResults.organic && searchResults.organic.length > 0) metin += searchResults.organic.slice(0, 5).map(item => item.snippet || "").join(" ");
+
+            if (!metin.trim()) {
+                const fallbackPrompt = `${gecmisMetni}İnternette güncel veri bulunamadı. Lütfen şu soruya kendi bilginle cevap ver: "${query}"`;
+                const fallbackResponse = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: fallbackPrompt
+                });
+                return res.json({ result: fallbackResponse.text });
+            }
+
+            const searchContents = `Aşağıdaki Google sonuçlarına göre bir özet hazırla:\n\nArama Verileri: ${metin}\n\n${gecmisMetni}Kullanıcının Yeni Sorusu: ${query}`;
             const aiResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: searchContents
@@ -151,13 +147,13 @@ app.post('/api/search', async (req, res) => {
 
             res.json({ result: aiResponse.text });
 
-        } catch (aiError) {
-            res.json({ result: "Anlık bir yoğunluk var, arama sonuçlarınız:\n\n" + metin });
+        } catch (e) {
+            res.json({ result: "İnternet araması (Serper) sırasında sorun oluştu: " + e.message });
         }
 
     } catch (error) {
-        console.error("Sunucu Hatası:", error);
-        res.status(500).json({ error: "İşlem sırasında bir hata oluştu." });
+        console.error("Kritik Sunucu Hatası:", error);
+        res.json({ result: "Sistemde kritik bir hata oluştu: " + error.message });
     }
 });
 
