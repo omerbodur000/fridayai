@@ -71,7 +71,7 @@ app.post('/api/search', async (req, res) => {
             
             try {
                 const aiResponse = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+                    model: 'gemini-1.5-flash',
                     contents: [{
                         role: 'user',
                         parts: [
@@ -93,7 +93,7 @@ app.post('/api/search', async (req, res) => {
         try {
             const routerPrompt = `Kullanıcının sorusu: "${query}"\nEğer bu soru; sadece güncel haber, anlık fiyat veya hava durumu ise SADECE "ARAMA" yaz.\nDiğer tüm durumlarda (sohbet, matematik, kod, bağlam vb.) SADECE "DIREKT" yaz.`;
             const routerResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 contents: routerPrompt
             });
             karar = routerResponse.text.trim().toUpperCase();
@@ -107,7 +107,7 @@ app.post('/api/search', async (req, res) => {
                 const directPrompt = `Sen F.R.I.D.A.Y. adında zeki bir asistansın. ÖNEMLİ KURALLAR:\n1. Kod düzeltmesi istenirse kodu Markdown formatında (\`\`\`) ver.\n2. Matematiksel işlemlerde KESİNLİKLE $ işareti veya LaTeX kullanma, düz dilde (örn: x kare) yaz.\n\n${gecmisMetni}Kullanıcının Yeni Sorusu: "${query}"`;
                 
                 const directResponse = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+                    model: 'gemini-1.5-flash',
                     contents: directPrompt
                 });
                 return res.json({ result: directResponse.text });
@@ -133,7 +133,7 @@ app.post('/api/search', async (req, res) => {
             if (!metin.trim()) {
                 const fallbackPrompt = `${gecmisMetni}İnternette güncel veri bulunamadı. Lütfen şu soruya kendi bilginle cevap ver: "${query}"`;
                 const fallbackResponse = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+                    model: 'gemini-1.5-flash',
                     contents: fallbackPrompt
                 });
                 return res.json({ result: fallbackResponse.text });
