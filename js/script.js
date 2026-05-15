@@ -295,3 +295,42 @@ async function iletisimGonder(event) {
         alert('Sunucuya bağlanılamadı.');
     }
 }
+
+// ==========================================
+// YENİ: SESLİ OKUMA (TEXT TO SPEECH)
+// ==========================================
+let konusuyor = false;
+let sentezleyici = window.speechSynthesis;
+
+function sesliOku() {
+    const metin = document.getElementById("cevap_kutusu").innerText;
+    const ikon = document.getElementById("sesIkonu");
+
+    if (!metin) return;
+
+    if (konusuyor) {
+        // Eğer asistan zaten konuşuyorsa ve butona tekrar basılırsa sustur
+        sentezleyici.cancel();
+        konusuyor = false;
+        ikon.className = "bi bi-volume-up text-secondary fs-5"; // İkonu eski haline getir
+        return;
+    }
+
+    // Okunacak metni hazırlıyoruz (kod bloklarını vs. temizleyip düz okuması için innerText kullandık)
+    const okuma = new SpeechSynthesisUtterance(metin);
+    okuma.lang = 'tr-TR'; // Türkçe aksan
+    okuma.rate = 1.0; // Okuma hızı (0.5 yavaş, 1 normal, 1.5 hızlı)
+
+    // Konuşma bittiğinde ikonu otomatik düzelt
+    okuma.onend = function() {
+        konusuyor = false;
+        ikon.className = "bi bi-volume-up text-secondary fs-5";
+    };
+
+    // Konuşmayı başlat
+    sentezleyici.speak(okuma);
+    konusuyor = true;
+    
+    // Konuşurken ikonun rengini mavi yap ve içini doldur (görsel geri bildirim)
+    ikon.className = "bi bi-volume-up-fill text-primary fs-5";
+}

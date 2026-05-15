@@ -132,7 +132,7 @@
                 display: flex !important; 
             }
         }
-
+        
         /* Resim Önizleme Stili */
         #imagePreview img {
             border: 2px solid var(--bs-primary);
@@ -157,21 +157,21 @@
                     <img src="logo/logo.png" alt="F.R.I.D.A.Y. Logo" class="img-fluid" style="max-width: 380px;">
                 </div>
                 <p class="text-secondary mb-4 mb-md-5 mx-auto w-100">Yapay zeka destekli akıllı arama deneyimi</p>
-
+                
                 <div id="imagePreview" class="mb-3 position-relative" style="display: none;">
                     <img src="" id="previewImg" style="max-height: 120px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                     <button class="btn btn-danger btn-sm rounded-circle position-absolute top-0 start-100 translate-middle" onclick="clearImage()">
                         <i class="bi bi-x"></i>
                     </button>
                 </div>
-
+                
                 <form class="d-flex search-box p-2 p-md-3 w-75 mb-4 mb-md-5 align-items-center mx-auto" onsubmit="aramaYap(event)">
                     
                     <input type="file" id="fileInput" accept="image/*" style="display: none;">
                     <button class="btn voice-btn me-1 me-md-2 rounded-circle p-2 bg-body-secondary border border-secondary shadow-sm" type="button" onclick="document.getElementById('fileInput').click()" title="Resim Ekle">
                         <i class="bi bi-camera fs-5" style="color: var(--bs-body-color);"></i>
                     </button>
-
+                    
                     <button class="btn voice-btn me-1 me-md-2 rounded-circle p-2 bg-body-secondary border border-secondary shadow-sm" type="button" onclick="sesleAra()" title="Sesle Ara">
                         <i class="bi bi-mic fs-5" style="color: var(--bs-body-color);"></i>
                     </button>
@@ -190,9 +190,10 @@
                         Henüz bir arama yapmadınız. Arama çubuğunu kullanarak hemen başlayın!
                     </p>
                 </div>
-
+                
                 <div class="main-card p-3 p-4 w-75 d-none cvp_kts mx-auto d-flex flex-column">
                     <div class="d-flex flex-row justify-content-end align-items-center gap-3 mb-2 px-1">
+                        <i class="bi bi-volume-up text-secondary fs-5" role="button" onclick="sesliOku()" title="Sesli Oku" id="sesIkonu" style="cursor: pointer; transition: 0.2s;"></i>
                         <i class="bi bi-copy text-secondary fs-5" role="button" onclick="kopyala()" title="Kopyala" style="cursor: pointer; transition: 0.2s;"></i>
                         <i class="bi bi-share text-secondary fs-5" role="button" onclick="paylas()" title="Paylaş" style="cursor: pointer; transition: 0.2s;"></i>
                     </div>
