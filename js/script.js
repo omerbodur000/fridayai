@@ -70,9 +70,22 @@ async function aramaYap(event) {
         sonucKutusu.innerHTML = sorgu ? `<strong>Arama Sonucu:</strong> ${sorgu}` : `<strong>Görsel Analizi Tamamlandı</strong>`;
         
         // Markdown formatını HTML'e çevirme
-        let formatliMetin = metin.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        formatliMetin = formatliMetin.replace(/\n/g, '<br>');
-        cevapKutusu.innerHTML = formatliMetin; 
+        // 1. Kod bloklarını (```) yakalayıp şık bir siyah kutuya çeviriyoruz
+        let formatliMetin = metin.replace(/```(\w*)\n([\s\S]*?)```/g, function(match, lang, code) {
+            // Kod içindeki HTML karakterlerini güvenli hale getiriyoruz ki site bozulmasın
+            let safeCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `<div class="bg-dark text-light p-3 rounded my-3 position-relative shadow-sm" style="overflow-x: auto; font-family: 'Courier New', Courier, monospace;">
+                        <span class="badge bg-secondary position-absolute top-0 end-0 m-2 opacity-75">${lang || 'kod'}</span>
+                        <pre class="m-0"><code>${safeCode}</code></pre>
+                    </div>`;
+        });
+
+        // 2. Kalan kalın yazıları formatla
+        formatliMetin = formatliMetin.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        
+        // 3. Düz metinlerdeki satır atlamalarını korumak için CSS kullanıyoruz
+        cevapKutusu.style.whiteSpace = 'pre-wrap';
+        cevapKutusu.innerHTML = formatliMetin;
         
         cvpKts.classList.remove('d-none');
         if(sorgu) gecmiseEkle(sorgu);

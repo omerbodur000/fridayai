@@ -89,9 +89,9 @@ Eğer bu soru; matematik, mantık bilmecesi, kodlama, makale yazımı, çeviri v
         
         const karar = routerResponse.text.trim().toUpperCase();
         
-        // Eğer matematik veya sohbet ise, Google'ı hiç karıştırma, kendi cevaplasın:
+        // Eğer matematik, kodlama veya sohbet ise kendi cevaplasın:
         if (karar.includes("DIREKT")) {
-            const directPrompt = `Sen F.R.I.D.A.Y. adında zeki bir asistansın. Kullanıcının şu sorusuna doğrudan, akıcı ve doğru bir yanıt ver: "${query}"\n\nÖNEMLİ KURAL: Yanıtında matematiksel formüller, denklemler veya köklü sayılar kullanacaksan KESİNLİKLE $ işareti veya LaTeX kodu (örn: \\sqrt) kullanma! İfadeleri herkesin okuyabileceği düz metin formatında yaz. (Örneğin: "2 kök 2", "x kare" veya "x^2" şeklinde yaz.)`;
+            const directPrompt = `Sen F.R.I.D.A.Y. adında usta bir yazılım mimarı ve zeki bir asistansın. Kullanıcının şu sorusuna doğrudan, akıcı ve doğru bir yanıt ver: "${query}"\n\nÖNEMLİ KURALLAR:\n1. Eğer kullanıcı bir kod gönderip düzeltmeni istiyorsa, hataları bul, açıkla ve düzeltilmiş kodu mutlaka Markdown formatında (üç ters tırnak \`\`\` arasına) yazarak ver.\n2. Matematiksel işlemlerde KESİNLİKLE $ işareti veya LaTeX kullanma, düz insan dilinde (örn: x kare, 2 kök 2) yaz.`;
             
             const directResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
