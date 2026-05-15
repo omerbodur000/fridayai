@@ -141,7 +141,7 @@ app.post('/api/search', async (req, res) => {
 
             const searchContents = `Aşağıdaki Google sonuçlarına göre bir özet hazırla:\n\nArama Verileri: ${metin}\n\n${gecmisMetni}Kullanıcının Yeni Sorusu: ${query}`;
             const aiResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 contents: searchContents
             });
 
