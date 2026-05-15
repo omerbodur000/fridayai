@@ -7,7 +7,7 @@ require('dotenv').config();
 const app = express();
 app.use(cors());
 
-// YENİ: Resim Base64 verileri büyük olduğu için limiti 50mb yaptık.
+// Resim verileri için limitleri yüksek tutuyoruz
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -53,10 +53,9 @@ app.post('/api/search', async (req, res) => {
     try {
         const { query, image } = req.body;
         
-        // --- 1. SENARYO: KULLANICI RESİM YÜKLEDİYSE (Serper Atlanır, Direkt Gemini Görsel Analiz) ---
+        // --- 1. SENARYO: GÖRSEL ANALİZ ---
         if (image) {
             let textPrompt = query ? query : "Lütfen bu resmi detaylıca analiz et ve ne gördüğünü bana Türkçe açıkla.";
-            
             try {
                 const aiResponse = await ai.models.generateContent({
                     model: 'gemini-2.5-flash',
@@ -75,9 +74,32 @@ app.post('/api/search', async (req, res) => {
             }
         }
 
-        // --- 2. SENARYO: SADECE METİN VARSA (Mevcut Serper Mantığı) ---
         if (!query) return res.json({ result: "Lütfen aramak için bir metin girin." });
 
+        // --- 2. YENİ SENARYO: ZEKİ YOL AYRIMI (ROUTER) ---
+        // F.R.I.D.A.Y.'e sorunun türünü soruyoruz.
+        const routerPrompt = `Sen sistemin beynisin. Kullanıcının şu sorusunu analiz et: "${query}"
+Eğer bu soru; güncel haber, fiyat, hava durumu, bir kurumun adresi veya gerçek zamanlı internet araması gerektiriyorsa SADECE "ARAMA" yaz.
+Eğer bu soru; matematik, mantık bilmecesi, kodlama, makale yazımı, çeviri veya genel bir sohbet ise SADECE "DIREKT" yaz.`;
+
+        const routerResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: routerPrompt
+        });
+        
+        const karar = routerResponse.text.trim().toUpperCase();
+        
+        // Eğer matematik veya sohbet ise, Google'ı hiç karıştırma, kendi cevaplasın:
+        if (karar.includes("DIREKT")) {
+            const directResponse = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: query
+            });
+            return res.json({ result: directResponse.text });
+        }
+
+        // --- 3. SENARYO: İNTERNET ARAMASI (Serper) ---
+        // Eğer karar "ARAMA" çıktıysa eski sistem devreye girer.
         const response = await fetch('https://google.serper.dev/search', {
             method: 'POST',
             headers: { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' },
@@ -96,23 +118,25 @@ app.post('/api/search', async (req, res) => {
             metin += searchResults.organic.slice(0, 5).map(item => item.snippet || "").join(" ");
         }
 
+        // İnternette veri bulunamazsa bile AI kendi bilgisiyle cevaplasın
         if (!metin.trim()) {
-            return res.json({ result: "Bu sorgu için internette hiçbir veri bulunamadı. Lütfen daha farklı bir kelime aratın." });
+            const fallbackResponse = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: query
+            });
+            return res.json({ result: fallbackResponse.text });
         }
 
         try {
             const aiResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: `Sen profesyonel bir asistansın. Aşağıdaki Google arama sonuçlarını (Arama Verileri) incele ve bana sadece bu verilere dayanarak kullanıcı için akıcı, doğal ve tek bir paragraftan oluşan Türkçe bir özet hazırla. Eğer veriler kısıtlıysa bile elindeki bilgileri toparlayıp tatmin edici bir cevap üret. Asla 'bilgi bulunamadı' veya 'özet çıkaramam' deme.\n\nArama Verileri: ${metin}`
+                contents: `Sen profesyonel bir asistansın. Aşağıdaki Google arama sonuçlarını (Arama Verileri) incele ve bana sadece bu verilere dayanarak kullanıcı için akıcı, doğal ve tek bir paragraftan oluşan Türkçe bir özet hazırla. Eğer veriler kısıtlıysa bile elindeki bilgileri toparlayıp tatmin edici bir cevap üret.\n\nArama Verileri: ${metin}`
             });
 
             res.json({ result: aiResponse.text });
 
         } catch (aiError) {
-            console.error("Yapay Zeka Hatası:", aiError.message);
-            res.json({ 
-                result: "Yapay zeka sunucularında anlık bir yoğunluk var, ancak arama sonuçlarınızın özeti aşağıdadır:\n\n" + metin 
-            });
+            res.json({ result: "Yapay zeka sunucularında anlık bir yoğunluk var, sonuçlar:\n\n" + metin });
         }
 
     } catch (error) {
@@ -164,7 +188,6 @@ app.get('/admin/login', (req, res) => {
     `);
 });
 
-// GİRİŞ İŞLEMİ KONTROLÜ
 app.post('/admin/login', (req, res) => {
     const { username, password } = req.body;
     const ADMIN_USER = process.env.ADMIN_USER;
@@ -175,14 +198,12 @@ app.post('/admin/login', (req, res) => {
     else { res.send(`<script>alert('Kullanıcı adı veya şifre hatalı!'); window.location.href = '/admin/login';</script>`); }
 });
 
-// ÇIKIŞ İŞLEMİ
 app.get('/admin/logout', (req, res) => {
     if (req.session) {
         req.session.destroy(() => { res.clearCookie('connect.sid'); res.redirect('/admin/login'); });
     } else { res.redirect('/admin/login'); }
 });
 
-// --- REST API ROTALARI ---
 app.get('/api/admin/messages', girisKontrol, (req, res) => {
     const BİR_AY_MS = 30 * 24 * 60 * 60 * 1000;
     const simdi = Date.now();
