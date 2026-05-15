@@ -167,15 +167,14 @@ function gecmisiYukle() {
     let gecmis = JSON.parse(localStorage.getItem('aramaGecmisi')) || [];
     liste.innerHTML = ''; 
     gecmis.forEach(sorgu => {
-        // İçinde tek tırnak geçen aramaların kodu bozmasını engellemek için
         const guvenliSorgu = sorgu.replace(/'/g, "\\'");
         
         liste.innerHTML += `
-            <li class="nav-item d-flex justify-content-between align-items-center mb-1 pe-2 rounded" style="transition: background 0.2s;">
-                <a class="nav-link text-white-50 p-1 small text-truncate" href="#" onclick="gecmistenAra('${guvenliSorgu}')" style="max-width: 85%;">
+            <li class="nav-item d-flex justify-content-between align-items-center mb-1 pe-2 w-100 rounded" style="transition: background 0.2s; overflow: hidden;">
+                <a class="nav-link text-white-50 p-1 small text-truncate" href="#" onclick="gecmistenAra('${guvenliSorgu}')" style="width: 85%; display: inline-block;">
                     <i class="bi bi-clock-history me-2"></i>${sorgu}
                 </a>
-                <i class="bi bi-trash text-white-50" role="button" onclick="gecmistenSil('${guvenliSorgu}')" title="Bu aramayı sil" style="cursor: pointer; font-size: 0.9rem;" onmouseover="this.classList.replace('text-white-50', 'text-danger')" onmouseout="this.classList.replace('text-danger', 'text-white-50')"></i>
+                <i class="bi bi-trash text-white-50 flex-shrink-0" role="button" onclick="gecmistenSil('${guvenliSorgu}')" title="Bu aramayı sil" style="cursor: pointer; font-size: 1rem;" onmouseover="this.classList.replace('text-white-50', 'text-danger')" onmouseout="this.classList.replace('text-danger', 'text-white-50')"></i>
             </li>
         `;
     });
