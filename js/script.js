@@ -162,10 +162,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// GÜNCELLENDİ: Geçmişe eklerken uzun metinleri kısalt ve HTML'i temizle
 function gecmiseEkle(sorgu) {
+    // 1. Satır atlamalarını boşluğa çevir ve < > işaretlerini zararsız hale getir (Güvenlik)
+    let temizSorgu = sorgu.replace(/\n/g, " ").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    
+    // 2. Eğer arama çok uzunsa (mesela kod yapıştırdıysan) sadece ilk 40 harfini kaydet
+    if (temizSorgu.length > 40) {
+        temizSorgu = temizSorgu.substring(0, 40) + "...";
+    }
+
     let gecmis = JSON.parse(localStorage.getItem('aramaGecmisi')) || [];
-    gecmis = gecmis.filter(item => item !== sorgu);
-    gecmis.unshift(sorgu); 
+    gecmis = gecmis.filter(item => item !== temizSorgu);
+    gecmis.unshift(temizSorgu); 
+    
     if (gecmis.length > 5) {
         gecmis.pop(); 
     }
@@ -173,14 +183,15 @@ function gecmiseEkle(sorgu) {
     gecmisiYukle();
 }
 
-// GÜNCELLENMİŞ: Geçmişi Yükleme (Yanına silme butonu eklendi)
+// GÜNCELLENDİ: Çift tırnak hatalarına karşı ekstra koruma
 function gecmisiYukle() {
     const liste = document.getElementById('gecmis_listesi');
     if(!liste) return;
     let gecmis = JSON.parse(localStorage.getItem('aramaGecmisi')) || [];
     liste.innerHTML = ''; 
     gecmis.forEach(sorgu => {
-        const guvenliSorgu = sorgu.replace(/'/g, "\\'");
+        // Hem tek tırnak hem çift tırnakların kodu bozmasını engelliyoruz
+        const guvenliSorgu = sorgu.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         
         liste.innerHTML += `
             <li class="nav-item d-flex justify-content-between align-items-center mb-1 pe-2 w-100 rounded" style="transition: background 0.2s; overflow: hidden;">
