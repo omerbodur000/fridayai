@@ -49,23 +49,40 @@ function girisKontrol(req, res, next) {
 // ============================================
 // YAPAY ZEKA (GEMINI) DESTEKLİ ARAMA VE GÖRSEL API
 // ============================================
+// ============================================
+// YAPAY ZEKA (GEMINI) DESTEKLİ ARAMA, GÖRSEL VE HAFIZA API
+// ============================================
 app.post('/api/search', async (req, res) => {
     try {
-        const { query, image } = req.body;
+        const { query, image, history } = req.body;
         
+        // 0. HAFIZAYI HAZIRLAMA (Frontend'den gelen geçmişi Gemini'nin okuyacağı formata çeviriyoruz)
+        let gecmisFormatli = [];
+        if (history && history.length > 0) {
+            gecmisFormatli = history.map(msg => ({
+                role: msg.role,
+                parts: [{ text: msg.text }]
+            }));
+        }
+
         // --- 1. SENARYO: GÖRSEL ANALİZ ---
         if (image) {
             let textPrompt = query ? query : "Lütfen bu resmi detaylıca analiz et ve ne gördüğünü bana Türkçe açıkla.";
+            
+            // Geçmişi ve resmi birleştiriyoruz
+            let visionContents = [...gecmisFormatli];
+            visionContents.push({
+                role: 'user',
+                parts: [
+                    { inlineData: { mimeType: 'image/jpeg', data: image } },
+                    { text: textPrompt }
+                ]
+            });
+
             try {
                 const aiResponse = await ai.models.generateContent({
                     model: 'gemini-2.5-flash',
-                    contents: [{
-                        role: 'user',
-                        parts: [
-                            { inlineData: { mimeType: 'image/jpeg', data: image } },
-                            { text: textPrompt }
-                        ]
-                    }]
+                    contents: visionContents
                 });
                 return res.json({ result: aiResponse.text });
             } catch (visionError) {
@@ -73,15 +90,12 @@ app.post('/api/search', async (req, res) => {
                 return res.status(500).json({ error: "Görsel incelenirken bir hata oluştu." });
             }
         }
-        
+
         if (!query) return res.json({ result: "Lütfen aramak için bir metin girin." });
-        
-        // --- 2. YENİ SENARYO: ZEKİ YOL AYRIMI (ROUTER) ---
-        // F.R.I.D.A.Y.'e sorunun türünü soruyoruz.
-        const routerPrompt = `Sen sistemin beynisin. Kullanıcının şu sorusunu analiz et: "${query}"
-Eğer bu soru; güncel haber, fiyat, hava durumu, bir kurumun adresi veya gerçek zamanlı internet araması gerektiriyorsa SADECE "ARAMA" yaz.
-Eğer bu soru; matematik, mantık bilmecesi, kodlama, makale yazımı, çeviri veya genel bir sohbet ise SADECE "DIREKT" yaz.`;
-        
+
+        // --- 2. ZEKİ YOL AYRIMI (ROUTER) ---
+        const routerPrompt = `Sen sistemin beynisin. Kullanıcının şu sorusunu analiz et: "${query}"\nEğer bu soru; güncel haber, fiyat, hava durumu veya güncel bilgi gerektiriyorsa SADECE "ARAMA" yaz.\nEğer bu soru; sohbetin devamıysa, bağlam içeriyorsa, matematik, kodlama veya sohbet ise SADECE "DIREKT" yaz.`;
+
         const routerResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: routerPrompt
@@ -89,58 +103,61 @@ Eğer bu soru; matematik, mantık bilmecesi, kodlama, makale yazımı, çeviri v
         
         const karar = routerResponse.text.trim().toUpperCase();
         
-        // Eğer matematik, kodlama veya sohbet ise kendi cevaplasın:
+        // --- DOĞRUDAN SOHBET SENARYOSU ---
         if (karar.includes("DIREKT")) {
-            const directPrompt = `Sen F.R.I.D.A.Y. adında usta bir yazılım mimarı ve zeki bir asistansın. Kullanıcının şu sorusuna doğrudan, akıcı ve doğru bir yanıt ver: "${query}"\n\nÖNEMLİ KURALLAR:\n1. Eğer kullanıcı bir kod gönderip düzeltmeni istiyorsa, hataları bul, açıkla ve düzeltilmiş kodu mutlaka Markdown formatında (üç ters tırnak \`\`\` arasına) yazarak ver.\n2. Matematiksel işlemlerde KESİNLİKLE $ işareti veya LaTeX kullanma, düz insan dilinde (örn: x kare, 2 kök 2) yaz.`;
-            
+            let directContents = [...gecmisFormatli];
+            directContents.push({
+                role: 'user',
+                parts: [{ text: `Sen F.R.I.D.A.Y. adında zeki bir asistansın. ÖNEMLİ KURALLAR:\n1. Kod düzeltmesi istenirse kodu Markdown formatında (\`\`\`) ver.\n2. Matematiksel işlemlerde KESİNLİKLE $ işareti veya LaTeX kullanma, düz dilde (örn: x kare) yaz.\n\nKullanıcının sorusu: "${query}"` }]
+            });
+
             const directResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: directPrompt
+                contents: directContents
             });
             return res.json({ result: directResponse.text });
         }
-        
-        // --- 3. SENARYO: İNTERNET ARAMASI (Serper) ---
-        // Eğer karar "ARAMA" çıktıysa eski sistem devreye girer.
+
+        // --- 3. SENARYO: İNTERNET ARAMASI (SERPER) ---
         const response = await fetch('https://google.serper.dev/search', {
             method: 'POST',
             headers: { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ q: query, hl: "tr", gl: "tr" })
         });
         const searchResults = await response.json();
-        
+
         let metin = "";
-        if (searchResults.knowledgeGraph && searchResults.knowledgeGraph.description) {
-            metin += searchResults.knowledgeGraph.description + " ";
-        }
-        if (searchResults.answerBox && searchResults.answerBox.snippet) {
-            metin += searchResults.answerBox.snippet + " ";
-        }
-        if (searchResults.organic && searchResults.organic.length > 0) {
-            metin += searchResults.organic.slice(0, 5).map(item => item.snippet || "").join(" ");
-        }
-        
-        // İnternette veri bulunamazsa bile AI kendi bilgisiyle cevaplasın
+        if (searchResults.knowledgeGraph && searchResults.knowledgeGraph.description) metin += searchResults.knowledgeGraph.description + " ";
+        if (searchResults.answerBox && searchResults.answerBox.snippet) metin += searchResults.answerBox.snippet + " ";
+        if (searchResults.organic && searchResults.organic.length > 0) metin += searchResults.organic.slice(0, 5).map(item => item.snippet || "").join(" ");
+
         if (!metin.trim()) {
+            let fallbackContents = [...gecmisFormatli, { role: 'user', parts: [{ text: query }] }];
             const fallbackResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: query
+                contents: fallbackContents
             });
             return res.json({ result: fallbackResponse.text });
         }
-        
+
         try {
+            let searchContents = [...gecmisFormatli];
+            searchContents.push({
+                role: 'user',
+                parts: [{ text: `Aşağıdaki Google arama sonuçlarını incele ve bana sadece bu verilere dayanarak akıcı bir Türkçe özet hazırla.\n\nArama Verileri: ${metin}\n\nKullanıcının Sorusu: ${query}` }]
+            });
+
             const aiResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: `Sen profesyonel bir asistansın. Aşağıdaki Google arama sonuçlarını (Arama Verileri) incele ve bana sadece bu verilere dayanarak kullanıcı için akıcı, doğal ve tek bir paragraftan oluşan Türkçe bir özet hazırla. Eğer veriler kısıtlıysa bile elindeki bilgileri toparlayıp tatmin edici bir cevap üret.\n\nArama Verileri: ${metin}`
+                contents: searchContents
             });
-            
+
             res.json({ result: aiResponse.text });
-            
+
         } catch (aiError) {
-            res.json({ result: "Yapay zeka sunucularında anlık bir yoğunluk var, sonuçlar:\n\n" + metin });
+            res.json({ result: "Anlık bir yoğunluk var, arama sonuçlarınız:\n\n" + metin });
         }
-        
+
     } catch (error) {
         console.error("Sunucu Hatası:", error);
         res.status(500).json({ error: "İşlem sırasında bir hata oluştu." });

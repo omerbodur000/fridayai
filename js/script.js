@@ -37,6 +37,12 @@ function clearImage() {
 // ==========================================
 // ARAMA YAPMA (METİN + GÖRSEL DESTEKLİ)
 // ==========================================
+let selectedImageBase64 = null;
+let sohbetHafizasi = []; // YENİ: F.R.I.D.A.Y.'in kısa süreli belleği
+
+// ==========================================
+// ARAMA YAPMA (METİN + GÖRSEL + HAFIZA DESTEKLİ)
+// ==========================================
 async function aramaYap(event) {
     if(event) event.preventDefault(); 
     
@@ -45,34 +51,34 @@ async function aramaYap(event) {
     const cevapKutusu = document.getElementById('cevap_kutusu');
     const cvpKts = document.querySelector('.cvp_kts');
 
-    // Hem resim hem yazı yoksa uyar
     if (!sorgu && !selectedImageBase64) return alert("Lütfen bir soru yazın veya bir resim yükleyin!");
 
-    sonucKutusu.innerHTML = `
-        <div class="spinner-border spinner-border-sm text-dark me-2" role="status"></div> 
-        F.R.I.D.A.Y. inceliyor...
-    `;
+    sonucKutusu.innerHTML = `<div class="spinner-border spinner-border-sm text-dark me-2" role="status"></div> F.R.I.D.A.Y. inceliyor...`;
     cvpKts.classList.add('d-none');
 
     try {
         const response = await fetch('/api/search', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            // Sunucuya artık hem sorguyu hem de resmi (varsa) gönderiyoruz
-            body: JSON.stringify({ query: sorgu, image: selectedImageBase64 }) 
+            headers: { 'Content-Type': 'application/json' },
+            // YENİ: Artık sunucuya 'history' (hafıza) dizisini de gönderiyoruz
+            body: JSON.stringify({ query: sorgu, image: selectedImageBase64, history: sohbetHafizasi }) 
         });
 
         const data = await response.json();
         let metin = data.result || "Arama sırasında bir hata oluştu.";
 
+        // YENİ: Konuşmayı hafızaya kaydet 
+        if (sorgu) {
+            sohbetHafizasi.push({ role: "user", text: sorgu });
+            sohbetHafizasi.push({ role: "model", text: metin });
+            // Sunucu çok şişmesin diye sadece son 6 mesajı (3 soru-cevap) aklında tutsun
+            if (sohbetHafizasi.length > 6) sohbetHafizasi.splice(0, 2);
+        }
+
         sonucKutusu.innerHTML = sorgu ? `<strong>Arama Sonucu:</strong> ${sorgu}` : `<strong>Görsel Analizi Tamamlandı</strong>`;
         
-        // Markdown formatını HTML'e çevirme
-        // 1. Kod bloklarını (```) yakalayıp şık bir siyah kutuya çeviriyoruz
+        // Kod bloklarını siyah kutuya çevirme
         let formatliMetin = metin.replace(/```(\w*)\n([\s\S]*?)```/g, function(match, lang, code) {
-            // Kod içindeki HTML karakterlerini güvenli hale getiriyoruz ki site bozulmasın
             let safeCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
             return `<div class="bg-dark text-light p-3 rounded my-3 position-relative shadow-sm" style="overflow-x: auto; font-family: 'Courier New', Courier, monospace;">
                         <span class="badge bg-secondary position-absolute top-0 end-0 m-2 opacity-75">${lang || 'kod'}</span>
@@ -80,12 +86,9 @@ async function aramaYap(event) {
                     </div>`;
         });
 
-        // 2. Kalan kalın yazıları formatla
         formatliMetin = formatliMetin.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        
-        // 3. Düz metinlerdeki satır atlamalarını korumak için CSS kullanıyoruz
         cevapKutusu.style.whiteSpace = 'pre-wrap';
-        cevapKutusu.innerHTML = formatliMetin;
+        cevapKutusu.innerHTML = formatliMetin; 
         
         cvpKts.classList.remove('d-none');
         if(sorgu) gecmiseEkle(sorgu);
@@ -94,7 +97,6 @@ async function aramaYap(event) {
         console.error("Hata:", error);
         sonucKutusu.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> Sunucuya bağlanılamadı.</span>`;
     } finally {
-        // İşlem bitince resmi ekrandan kaldır, bir sonraki arama için temizle
         clearImage();
         document.getElementById('aranan_kutu').value = '';
     }
