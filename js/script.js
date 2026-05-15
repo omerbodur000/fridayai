@@ -160,20 +160,36 @@ function gecmiseEkle(sorgu) {
     gecmisiYukle();
 }
 
+// GÜNCELLENMİŞ: Geçmişi Yükleme (Yanına silme butonu eklendi)
 function gecmisiYukle() {
     const liste = document.getElementById('gecmis_listesi');
     if(!liste) return;
     let gecmis = JSON.parse(localStorage.getItem('aramaGecmisi')) || [];
     liste.innerHTML = ''; 
     gecmis.forEach(sorgu => {
+        // İçinde tek tırnak geçen aramaların kodu bozmasını engellemek için
+        const guvenliSorgu = sorgu.replace(/'/g, "\\'");
+        
         liste.innerHTML += `
-            <li class="nav-item">
-                <a class="nav-link text-secondary" href="#" onclick="gecmistenAra('${sorgu}')">
+            <li class="nav-item d-flex justify-content-between align-items-center mb-1 pe-2 rounded" style="transition: background 0.2s;">
+                <a class="nav-link text-white-50 p-1 small text-truncate" href="#" onclick="gecmistenAra('${guvenliSorgu}')" style="max-width: 85%;">
                     <i class="bi bi-clock-history me-2"></i>${sorgu}
                 </a>
+                <i class="bi bi-trash text-white-50" role="button" onclick="gecmistenSil('${guvenliSorgu}')" title="Bu aramayı sil" style="cursor: pointer; font-size: 0.9rem;" onmouseover="this.classList.replace('text-white-50', 'text-danger')" onmouseout="this.classList.replace('text-danger', 'text-white-50')"></i>
             </li>
         `;
     });
+}
+
+// YENİ: Geçmişten Tekil Öğe Silme Fonksiyonu
+function gecmistenSil(sorgu) {
+    let gecmis = JSON.parse(localStorage.getItem('aramaGecmisi')) || [];
+    // Tıklanan sorguyu diziden çıkar (filtrele)
+    gecmis = gecmis.filter(item => item !== sorgu);
+    // Kalan listeyi tekrar kaydet
+    localStorage.setItem('aramaGecmisi', JSON.stringify(gecmis));
+    // Listeyi ekranda anında güncelle
+    gecmisiYukle();
 }
 
 function gecmistenAra(sorgu) {
