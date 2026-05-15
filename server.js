@@ -47,13 +47,13 @@ function girisKontrol(req, res, next) {
 }
 
 // ============================================
-// YAPAY ZEKA (GEMINI) DESTEKLİ ARAMA, GÖRSEL VE HAFIZA API (KURŞUNGEÇİRMEZ VERSİYON)
+// YAPAY ZEKA (TEK HAMLE - KOTA DOSTU VE ZIRHLI VERSİYON)
 // ============================================
 app.post('/api/search', async (req, res) => {
     try {
         const { query, image, history } = req.body;
         
-        // 1. HAFIZAYI DÜZ METNE ÇEVİR (En güvenli ve hatasız yöntem)
+        // 1. HAFIZAYI HAZIRLA
         let gecmisMetni = "";
         if (history && history.length > 0) {
             gecmisMetni = "--- ÖNCEKİ KONUŞMALAR ---\n";
@@ -64,14 +64,14 @@ app.post('/api/search', async (req, res) => {
             gecmisMetni += "-------------------------\n\n";
         }
 
-        // --- 1. SENARYO: GÖRSEL ANALİZ ---
+        // --- GÖRSEL ANALİZ SENARYOSU ---
         if (image) {
             let textPrompt = query ? query : "Lütfen bu resmi analiz et.";
             let visionPrompt = gecmisMetni + "Kullanıcının Yeni Sorusu: " + textPrompt;
             
             try {
                 const aiResponse = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
+                    model: 'gemini-2.5-flash',
                     contents: [{
                         role: 'user',
                         parts: [
@@ -82,41 +82,14 @@ app.post('/api/search', async (req, res) => {
                 });
                 return res.json({ result: aiResponse.text });
             } catch (e) {
-                return res.json({ result: "Görsel işlenirken Google sunucularında hata: " + e.message });
+                return res.json({ result: "Görsel işlenirken hata oluştu: " + e.message });
             }
         }
 
         if (!query) return res.json({ result: "Lütfen aramak için bir metin girin." });
 
-        // --- 2. ZEKİ YOL AYRIMI (ROUTER) ---
-        let karar = "DIREKT"; // Her ihtimale karşı varsayılan olarak kendi çözsün
-        try {
-            const routerPrompt = `Kullanıcının sorusu: "${query}"\nEğer bu soru; sadece güncel haber, anlık fiyat veya hava durumu ise SADECE "ARAMA" yaz.\nDiğer tüm durumlarda (sohbet, matematik, kod, bağlam vb.) SADECE "DIREKT" yaz.`;
-            const routerResponse = await ai.models.generateContent({
-                model: 'gemini-1.5-flash',
-                contents: routerPrompt
-            });
-            karar = routerResponse.text.trim().toUpperCase();
-        } catch (e) {
-            console.error("Yol Ayrımı Hatası (Atlandı):", e.message);
-        }
-        
-        // --- DOĞRUDAN SOHBET SENARYOSU ---
-        if (karar.includes("DIREKT") || karar.includes("DİREKT")) {
-            try {
-                const directPrompt = `Sen F.R.I.D.A.Y. adında zeki bir asistansın. ÖNEMLİ KURALLAR:\n1. Kod düzeltmesi istenirse kodu Markdown formatında (\`\`\`) ver.\n2. Matematiksel işlemlerde KESİNLİKLE $ işareti veya LaTeX kullanma, düz dilde (örn: x kare) yaz.\n\n${gecmisMetni}Kullanıcının Yeni Sorusu: "${query}"`;
-                
-                const directResponse = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
-                    contents: directPrompt
-                });
-                return res.json({ result: directResponse.text });
-            } catch (e) {
-                return res.json({ result: "Cevap üretilirken hata oluştu: " + e.message });
-            }
-        }
-
-        // --- 3. SENARYO: İNTERNET ARAMASI (SERPER) ---
+        // --- İNTERNET VERİSİNİ SESSİZCE ÇEK (Serper API kotası Gemini'den bağımsızdır) ---
+        let internetMetni = "";
         try {
             const response = await fetch('https://google.serper.dev/search', {
                 method: 'POST',
@@ -125,30 +98,34 @@ app.post('/api/search', async (req, res) => {
             });
             const searchResults = await response.json();
 
-            let metin = "";
-            if (searchResults.knowledgeGraph && searchResults.knowledgeGraph.description) metin += searchResults.knowledgeGraph.description + " ";
-            if (searchResults.answerBox && searchResults.answerBox.snippet) metin += searchResults.answerBox.snippet + " ";
-            if (searchResults.organic && searchResults.organic.length > 0) metin += searchResults.organic.slice(0, 5).map(item => item.snippet || "").join(" ");
-
-            if (!metin.trim()) {
-                const fallbackPrompt = `${gecmisMetni}İnternette güncel veri bulunamadı. Lütfen şu soruya kendi bilginle cevap ver: "${query}"`;
-                const fallbackResponse = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
-                    contents: fallbackPrompt
-                });
-                return res.json({ result: fallbackResponse.text });
-            }
-
-            const searchContents = `Aşağıdaki Google sonuçlarına göre bir özet hazırla:\n\nArama Verileri: ${metin}\n\n${gecmisMetni}Kullanıcının Yeni Sorusu: ${query}`;
-            const aiResponse = await ai.models.generateContent({
-                model: 'gemini-1.5-flash',
-                contents: searchContents
-            });
-
-            res.json({ result: aiResponse.text });
-
+            if (searchResults.knowledgeGraph && searchResults.knowledgeGraph.description) internetMetni += searchResults.knowledgeGraph.description + " ";
+            if (searchResults.answerBox && searchResults.answerBox.snippet) internetMetni += searchResults.answerBox.snippet + " ";
+            if (searchResults.organic && searchResults.organic.length > 0) internetMetni += searchResults.organic.slice(0, 5).map(item => item.snippet || "").join(" ");
         } catch (e) {
-            res.json({ result: "İnternet araması (Serper) sırasında sorun oluştu: " + e.message });
+            console.log("İnternet araması atlandı.");
+        }
+
+        // --- TEK VE GÜÇLÜ GEMINI ÇAĞRISI ---
+        const anaPrompt = `Sen F.R.I.D.A.Y. adında zeki bir asistansın.
+ÖNEMLİ KURALLAR:
+1. Kod istenirse Markdown formatında (\`\`\`) ver.
+2. Matematikte KESİNLİKLE $ veya LaTeX kullanma, düz dilde (örn: 2 kök 2) yaz.
+3. Aşağıda "İnternet Verileri" varsa ve soru "Şu an hava nasıl, dolar ne kadar" gibi güncel bir bilgiyse o veriyi kullan.
+4. Soru sadece senin adın, matematik bilmecesi veya sohbet ise internet verisini yoksay ve DİREKT zekanla cevap ver.
+
+${gecmisMetni}
+İnternet Verileri: ${internetMetni ? internetMetni : "Veri bulunamadı."}
+
+Kullanıcının Yeni Sorusu: "${query}"`;
+
+        try {
+            const aiResponse = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: anaPrompt
+            });
+            return res.json({ result: aiResponse.text });
+        } catch (e) {
+            return res.json({ result: "Çok hızlı soru sorduk, Google API kısa süreliğine bizi bekletiyor. Lütfen 15-20 saniye bekleyip tekrar dene!\n(Hata Detayı: " + e.message + ")" });
         }
 
     } catch (error) {
