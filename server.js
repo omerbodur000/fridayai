@@ -7,7 +7,7 @@ require('dotenv').config();
 const app = express();
 app.use(cors());
 
-// YENİ: Resim Base64 verileri büyük olduğu için limiti 50mb yaptık.
+// Resim verileri için limitleri yüksek tutuyoruz
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -47,15 +47,27 @@ function girisKontrol(req, res, next) {
 }
 
 // ============================================
-// YAPAY ZEKA (GEMINI) DESTEKLİ ARAMA VE GÖRSEL API
+// YAPAY ZEKA (TEK HAMLE - KOTA DOSTU VE ZIRHLI VERSİYON)
 // ============================================
 app.post('/api/search', async (req, res) => {
     try {
-        const { query, image } = req.body;
+        const { query, image, history } = req.body;
         
-        // --- 1. SENARYO: KULLANICI RESİM YÜKLEDİYSE (Serper Atlanır, Direkt Gemini Görsel Analiz) ---
+        // 1. HAFIZAYI HAZIRLA
+        let gecmisMetni = "";
+        if (history && history.length > 0) {
+            gecmisMetni = "--- ÖNCEKİ KONUŞMALAR ---\n";
+            history.forEach(msg => {
+                let kim = msg.role === "user" ? "Kullanıcı" : "Sen (F.R.I.D.A.Y.)";
+                gecmisMetni += `${kim}: ${msg.text}\n`;
+            });
+            gecmisMetni += "-------------------------\n\n";
+        }
+
+        // --- GÖRSEL ANALİZ SENARYOSU ---
         if (image) {
-            let textPrompt = query ? query : "Lütfen bu resmi detaylıca analiz et ve ne gördüğünü bana Türkçe açıkla.";
+            let textPrompt = query ? query : "Lütfen bu resmi analiz et.";
+            let visionPrompt = gecmisMetni + "Kullanıcının Yeni Sorusu: " + textPrompt;
             
             try {
                 const aiResponse = await ai.models.generateContent({
@@ -64,44 +76,51 @@ app.post('/api/search', async (req, res) => {
                         role: 'user',
                         parts: [
                             { inlineData: { mimeType: 'image/jpeg', data: image } },
-                            { text: textPrompt }
+                            { text: visionPrompt }
                         ]
                     }]
                 });
                 return res.json({ result: aiResponse.text });
-            } catch (visionError) {
-                console.error("Görsel Analiz Hatası:", visionError.message);
-                return res.status(500).json({ error: "Görsel incelenirken bir hata oluştu." });
+            } catch (e) {
+                return res.json({ result: "Görsel işlenirken hata oluştu: " + e.message });
             }
         }
 
-        // --- 2. SENARYO: SADECE METİN VARSA (Mevcut Serper Mantığı) ---
         if (!query) return res.json({ result: "Lütfen aramak için bir metin girin." });
 
-        const response = await fetch('https://google.serper.dev/search', {
-            method: 'POST',
-            headers: { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ q: query, hl: "tr", gl: "tr" })
-        });
-        const searchResults = await response.json();
+        // --- İNTERNET VERİSİNİ SESSİZCE ÇEK (Serper API kotası Gemini'den bağımsızdır) ---
+        let internetMetni = "";
+        try {
+            const response = await fetch('https://google.serper.dev/search', {
+                method: 'POST',
+                headers: { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ q: query, hl: "tr", gl: "tr" })
+            });
+            const searchResults = await response.json();
 
-        let metin = "";
-        if (searchResults.knowledgeGraph && searchResults.knowledgeGraph.description) {
-            metin += searchResults.knowledgeGraph.description + " ";
-        }
-        if (searchResults.answerBox && searchResults.answerBox.snippet) {
-            metin += searchResults.answerBox.snippet + " ";
-        }
-        if (searchResults.organic && searchResults.organic.length > 0) {
-            metin += searchResults.organic.slice(0, 5).map(item => item.snippet || "").join(" ");
+            if (searchResults.knowledgeGraph && searchResults.knowledgeGraph.description) internetMetni += searchResults.knowledgeGraph.description + " ";
+            if (searchResults.answerBox && searchResults.answerBox.snippet) internetMetni += searchResults.answerBox.snippet + " ";
+            if (searchResults.organic && searchResults.organic.length > 0) internetMetni += searchResults.organic.slice(0, 5).map(item => item.snippet || "").join(" ");
+        } catch (e) {
+            console.log("İnternet araması atlandı.");
         }
 
-        if (!metin.trim()) {
-            return res.json({ result: "Bu sorgu için internette hiçbir veri bulunamadı. Lütfen daha farklı bir kelime aratın." });
-        }
+        // --- TEK VE GÜÇLÜ GEMINI ÇAĞRISI ---
+        const anaPrompt = `Sen F.R.I.D.A.Y. adında zeki bir asistansın.
+ÖNEMLİ KURALLAR:
+1. Kod istenirse Markdown formatında (\`\`\`) ver.
+2. Matematikte KESİNLİKLE $ veya LaTeX kullanma, düz dilde (örn: 2 kök 2) yaz.
+3. Aşağıda "İnternet Verileri" varsa ve soru "Şu an hava nasıl, dolar ne kadar" gibi güncel bir bilgiyse o veriyi kullan.
+4. Soru sadece senin adın, matematik bilmecesi veya sohbet ise internet verisini yoksay ve DİREKT zekanla cevap ver.
+
+${gecmisMetni}
+İnternet Verileri: ${internetMetni ? internetMetni : "Veri bulunamadı."}
+
+Kullanıcının Yeni Sorusu: "${query}"`;
 
         try {
             const aiResponse = await ai.models.generateContent({
+<<<<<<< HEAD
                 model: 'gemini-1.5-flash',
                 contents: `Sen profesyonel bir asistansın. Aşağıdaki Google arama sonuçlarını (Arama Verileri) incele ve bana sadece bu verilere dayanarak kullanıcı için akıcı, doğal ve tek bir paragraftan oluşan Türkçe bir özet hazırla. Eğer veriler kısıtlıysa bile elindeki bilgileri toparlayıp tatmin edici bir cevap üret. Asla 'bilgi bulunamadı' veya 'özet çıkaramam' deme.\n\nArama Verileri: ${metin}`
             });
@@ -112,12 +131,19 @@ app.post('/api/search', async (req, res) => {
             console.error("Yapay Zeka Hatası:", aiError.message);
             res.json({ 
                 result: "Yapay zeka sunucularında anlık bir yoğunluk var, ancak arama sonuçlarınızın özeti aşağıdadır:\n\n" + metin 
+=======
+                model: 'gemini-2.5-flash',
+                contents: anaPrompt
+>>>>>>> 847729c87f8d2e20f3d271e427c432d2646e55e9
             });
+            return res.json({ result: aiResponse.text });
+        } catch (e) {
+            return res.json({ result: "Çok hızlı soru sorduk, Google API kısa süreliğine bizi bekletiyor. Lütfen 15-20 saniye bekleyip tekrar dene!\n(Hata Detayı: " + e.message + ")" });
         }
 
     } catch (error) {
-        console.error("Sunucu Hatası:", error);
-        res.status(500).json({ error: "İşlem sırasında bir hata oluştu." });
+        console.error("Kritik Sunucu Hatası:", error);
+        res.json({ result: "Sistemde kritik bir hata oluştu: " + error.message });
     }
 });
 
@@ -164,25 +190,22 @@ app.get('/admin/login', (req, res) => {
     `);
 });
 
-// GİRİŞ İŞLEMİ KONTROLÜ
 app.post('/admin/login', (req, res) => {
     const { username, password } = req.body;
     const ADMIN_USER = process.env.ADMIN_USER;
     const ADMIN_PASS = process.env.ADMIN_PASS;
-
+    
     if (!ADMIN_USER || !ADMIN_PASS) return res.send(`<script>alert('Yönetici bilgileri eksik!'); window.location.href = '/admin/login';</script>`);
     if (username === ADMIN_USER && password === ADMIN_PASS) { req.session.adminGirisli = true; res.redirect('/admin'); } 
     else { res.send(`<script>alert('Kullanıcı adı veya şifre hatalı!'); window.location.href = '/admin/login';</script>`); }
 });
 
-// ÇIKIŞ İŞLEMİ
 app.get('/admin/logout', (req, res) => {
     if (req.session) {
         req.session.destroy(() => { res.clearCookie('connect.sid'); res.redirect('/admin/login'); });
     } else { res.redirect('/admin/login'); }
 });
 
-// --- REST API ROTALARI ---
 app.get('/api/admin/messages', girisKontrol, (req, res) => {
     const BİR_AY_MS = 30 * 24 * 60 * 60 * 1000;
     const simdi = Date.now();

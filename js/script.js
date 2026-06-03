@@ -1,8 +1,9 @@
-// Resmi hafızada tutacağımız değişken
+// Resmi ve sohbet geçmişini hafızada tutacağımız değişkenler
 let selectedImageBase64 = null;
+let sohbetHafizasi = []; 
 
 // ==========================================
-// RESİM SEÇME VE ÖNİZLEME (YENİ EKLENDİ)
+// RESİM SEÇME VE ÖNİZLEME
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('fileInput');
@@ -12,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(event) {
-                    // Base64 formatını sunucuya uygun hale getiriyoruz
                     selectedImageBase64 = event.target.result.split(',')[1]; 
                     document.getElementById('previewImg').src = event.target.result;
                     document.getElementById('imagePreview').style.display = 'block';
@@ -23,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Resmi arayüzden ve hafızadan silen fonksiyon
 function clearImage() {
     selectedImageBase64 = null;
     const fileInput = document.getElementById('fileInput');
@@ -35,7 +34,7 @@ function clearImage() {
 }
 
 // ==========================================
-// ARAMA YAPMA (METİN + GÖRSEL DESTEKLİ)
+// ARAMA YAPMA (METİN + GÖRSEL + HAFIZA DESTEKLİ)
 // ==========================================
 async function aramaYap(event) {
     if(event) event.preventDefault(); 
@@ -45,33 +44,42 @@ async function aramaYap(event) {
     const cevapKutusu = document.getElementById('cevap_kutusu');
     const cvpKts = document.querySelector('.cvp_kts');
 
-    // Hem resim hem yazı yoksa uyar
     if (!sorgu && !selectedImageBase64) return alert("Lütfen bir soru yazın veya bir resim yükleyin!");
 
-    sonucKutusu.innerHTML = `
-        <div class="spinner-border spinner-border-sm text-dark me-2" role="status"></div> 
-        F.R.I.D.A.Y. inceliyor...
-    `;
+    sonucKutusu.innerHTML = `<div class="spinner-border spinner-border-sm text-dark me-2" role="status"></div> F.R.I.D.A.Y. inceliyor...`;
     cvpKts.classList.add('d-none');
 
     try {
         const response = await fetch('/api/search', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            // Sunucuya artık hem sorguyu hem de resmi (varsa) gönderiyoruz
-            body: JSON.stringify({ query: sorgu, image: selectedImageBase64 }) 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: sorgu, image: selectedImageBase64, history: sohbetHafizasi }) 
         });
 
         const data = await response.json();
         let metin = data.result || "Arama sırasında bir hata oluştu.";
 
+        // Konuşmayı hafızaya kaydet 
+        if (sorgu) {
+            sohbetHafizasi.push({ role: "user", text: sorgu });
+            sohbetHafizasi.push({ role: "model", text: metin });
+            // Sunucu çok şişmesin diye sadece son 6 mesajı aklında tutsun
+            if (sohbetHafizasi.length > 6) sohbetHafizasi.splice(0, 2);
+        }
+
         sonucKutusu.innerHTML = sorgu ? `<strong>Arama Sonucu:</strong> ${sorgu}` : `<strong>Görsel Analizi Tamamlandı</strong>`;
         
-        // Markdown formatını HTML'e çevirme
-        let formatliMetin = metin.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        formatliMetin = formatliMetin.replace(/\n/g, '<br>');
+        // Kod bloklarını siyah kutuya çevirme
+        let formatliMetin = metin.replace(/```(\w*)\n([\s\S]*?)```/g, function(match, lang, code) {
+            let safeCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `<div class="bg-dark text-light p-3 rounded my-3 position-relative shadow-sm" style="overflow-x: auto; font-family: 'Courier New', Courier, monospace;">
+                        <span class="badge bg-secondary position-absolute top-0 end-0 m-2 opacity-75">${lang || 'kod'}</span>
+                        <pre class="m-0"><code>${safeCode}</code></pre>
+                    </div>`;
+        });
+
+        formatliMetin = formatliMetin.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        cevapKutusu.style.whiteSpace = 'pre-wrap';
         cevapKutusu.innerHTML = formatliMetin; 
         
         cvpKts.classList.remove('d-none');
@@ -81,14 +89,13 @@ async function aramaYap(event) {
         console.error("Hata:", error);
         sonucKutusu.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> Sunucuya bağlanılamadı.</span>`;
     } finally {
-        // İşlem bitince resmi ekrandan kaldır, bir sonraki arama için temizle
         clearImage();
         document.getElementById('aranan_kutu').value = '';
     }
 }
 
 // ==========================================
-// DİĞER MEVCUT FONKSİYONLAR (BOZULMADAN KALDI)
+// DİĞER MEVCUT FONKSİYONLAR
 // ==========================================
 function kopyala() {
     let text = document.getElementById("cevap_kutusu").innerText;
@@ -150,9 +157,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function gecmiseEkle(sorgu) {
+    let temizSorgu = sorgu.replace(/\n/g, " ").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    if (temizSorgu.length > 40) {
+        temizSorgu = temizSorgu.substring(0, 40) + "...";
+    }
+
     let gecmis = JSON.parse(localStorage.getItem('aramaGecmisi')) || [];
-    gecmis = gecmis.filter(item => item !== sorgu);
-    gecmis.unshift(sorgu); 
+    gecmis = gecmis.filter(item => item !== temizSorgu);
+    gecmis.unshift(temizSorgu); 
+    
     if (gecmis.length > 5) {
         gecmis.pop(); 
     }
@@ -166,14 +179,24 @@ function gecmisiYukle() {
     let gecmis = JSON.parse(localStorage.getItem('aramaGecmisi')) || [];
     liste.innerHTML = ''; 
     gecmis.forEach(sorgu => {
+        const guvenliSorgu = sorgu.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        
         liste.innerHTML += `
-            <li class="nav-item">
-                <a class="nav-link text-secondary" href="#" onclick="gecmistenAra('${sorgu}')">
+            <li class="nav-item d-flex justify-content-between align-items-center mb-1 pe-2 w-100 rounded" style="transition: background 0.2s; overflow: hidden;">
+                <a class="nav-link text-white-50 p-1 small text-truncate" href="#" onclick="gecmistenAra('${guvenliSorgu}')" style="width: 85%; display: inline-block;">
                     <i class="bi bi-clock-history me-2"></i>${sorgu}
                 </a>
+                <i class="bi bi-trash text-white-50 flex-shrink-0" role="button" onclick="gecmistenSil('${guvenliSorgu}')" title="Bu aramayı sil" style="cursor: pointer; font-size: 1rem;" onmouseover="this.classList.replace('text-white-50', 'text-danger')" onmouseout="this.classList.replace('text-danger', 'text-white-50')"></i>
             </li>
         `;
     });
+}
+
+function gecmistenSil(sorgu) {
+    let gecmis = JSON.parse(localStorage.getItem('aramaGecmisi')) || [];
+    gecmis = gecmis.filter(item => item !== sorgu);
+    localStorage.setItem('aramaGecmisi', JSON.stringify(gecmis));
+    gecmisiYukle();
 }
 
 function gecmistenAra(sorgu) {
@@ -266,4 +289,37 @@ async function iletisimGonder(event) {
         console.error('Hata:', error);
         alert('Sunucuya bağlanılamadı.');
     }
+}
+
+// ==========================================
+// SESLİ OKUMA (TEXT TO SPEECH)
+// ==========================================
+let konusuyor = false;
+let sentezleyici = window.speechSynthesis;
+
+function sesliOku() {
+    const metin = document.getElementById("cevap_kutusu").innerText;
+    const ikon = document.getElementById("sesIkonu");
+
+    if (!metin) return;
+
+    if (konusuyor) {
+        sentezleyici.cancel();
+        konusuyor = false;
+        ikon.className = "bi bi-volume-up text-secondary fs-5"; 
+        return;
+    }
+
+    const okuma = new SpeechSynthesisUtterance(metin);
+    okuma.lang = 'tr-TR'; 
+    okuma.rate = 1.0; 
+
+    okuma.onend = function() {
+        konusuyor = false;
+        ikon.className = "bi bi-volume-up text-secondary fs-5";
+    };
+
+    sentezleyici.speak(okuma);
+    konusuyor = true;
+    ikon.className = "bi bi-volume-up-fill text-primary fs-5";
 }
