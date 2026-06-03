@@ -59,7 +59,7 @@ app.post('/api/search', async (req, res) => {
             
             try {
                 const aiResponse = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+                    model: 'gemini-1.5-flash',
                     contents: [{
                         role: 'user',
                         parts: [
@@ -102,7 +102,7 @@ app.post('/api/search', async (req, res) => {
 
         try {
             const aiResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 contents: `Sen profesyonel bir asistansın. Aşağıdaki Google arama sonuçlarını (Arama Verileri) incele ve bana sadece bu verilere dayanarak kullanıcı için akıcı, doğal ve tek bir paragraftan oluşan Türkçe bir özet hazırla. Eğer veriler kısıtlıysa bile elindeki bilgileri toparlayıp tatmin edici bir cevap üret. Asla 'bilgi bulunamadı' veya 'özet çıkaramam' deme.\n\nArama Verileri: ${metin}`
             });
 
